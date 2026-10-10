@@ -668,6 +668,16 @@
 </div>
 </div>
 
+<!-- Indexing Modal -->
+<div id="indexing-modal" class="overlay-modal" style="display: none; padding: 20px; z-index: 10006; text-align: left; background: var(--bg-color); border: 1px solid var(--text-color); box-shadow: 4px 4px 0 var(--text-color); min-width: 300px; flex-direction: column;">
+    <strong style="margin: 0; color: var(--text-color); font-size: 1.2em;">Please wait</strong>
+    <p style="margin: 15px 0 5px 0; color: var(--text-color);">Indexing files from <span id="indexing-dir-path"></span></p>
+    <p style="margin: 0 0 15px 0; color: var(--prompt-color); font-size: 0.9em;">This may take a few moments.</p>
+    <div style="display: flex; gap: 15px; color: var(--text-color);">
+        <a href="#" id="indexing-cancel-btn">[cancel]</a>
+    </div>
+</div>
+
 <!-- Prompt Modal -->
 <div id="prompt-modal" class="overlay-modal" style="display: none; padding: 20px; z-index: 10005; text-align: left; background: var(--bg-color); border: 1px solid var(--text-color); box-shadow: 4px 4px 0 var(--text-color); min-width: 300px; flex-direction: column;">
     <strong id="prompt-modal-title" style="margin: 0; color: var(--text-color); font-size: 1.2em;">prompt</strong>
