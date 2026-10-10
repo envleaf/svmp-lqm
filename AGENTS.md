@@ -18,3 +18,18 @@ The following features are critical and MUST NOT be broken, altered, or removed 
 
 - Ignore anything in the ARCHIVE folder
 
+## Versioning Instructions for Agents
+
+<!-- AGENT VERSIONING COMMENT
+Current Version: 0.0.46
+Current Branch Tag: nightly-lqm
+
+Rules for Updating Versioning:
+1. Version format is MAJOR.MINOR.PATCH (e.g., 0.0.46).
+2. Starting version is 0.0.46 with branch tag "nightly-lqm".
+3. When the MINOR patch version increases (the second position in 0.0.0, e.g., from 0.0.x to 0.1.x), automatically update the branch tag from "nightly-lqm" to "release-lqm".
+4. The "LQM" suffix (-lqm) should NEVER be modified unless explicitly instructed.
+5. Note: The source repo being pulled from is envleaf/svmp, NOT envleaf/svmp-lqm.
+6. Always reflect version and branch tag updates in player.html inside the keybind modal:
+   Format: svmp-lqm <VERSION> (<BRANCH-TAG>)
+-->

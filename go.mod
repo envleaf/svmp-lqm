@@ -1,4 +1,4 @@
-module envleaf/player
+module envleaf/svmp-lqm
 
 go 1.24.3
 
