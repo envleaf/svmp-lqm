@@ -1,0 +1,407 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io/fs"
+	"log"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/dhowden/tag"
+	"github.com/fsnotify/fsnotify"
+	webview "github.com/webview/webview_go"
+	"gopkg.in/yaml.v3"
+)
+
+// AppConfig represents the entire application configuration map
+type AppConfig map[string]interface{}
+
+type FileItem struct {
+	Name  string `json:"name"`
+	IsDir bool   `json:"isDir"`
+}
+
+type TrackInfo struct {
+	Src          string `json:"src"`
+	Title        string `json:"title"`
+	Artist       string `json:"artist"`
+	OriginalName string `json:"originalName"`
+	OriginalPath string `json:"originalPath"`
+}
+
+var currentBrowserPath string
+var selectedMusicDir string
+var w webview.WebView
+var localServerPort string
+
+var configPath string
+
+func loadConfig() AppConfig {
+	config := make(AppConfig)
+
+	data, err := os.ReadFile(configPath)
+	if err == nil {
+		if err := yaml.Unmarshal(data, &config); err != nil {
+			log.Println("Error parsing svmp.conf:", err)
+		}
+	} else if os.IsNotExist(err) {
+		// Default config mimicking ConfigManager state
+		config = AppConfig{
+			"fx": map[string]interface{}{
+				"kawaii": false, "maxTrip": false, "theme": "default",
+				"rgb": false, "crt": false, "invert": false,
+				"obfuscate": false, "bg": "plasma",
+			},
+			"eq": map[string]interface{}{
+				"bass": 0, "mid": 0, "treble": 0,
+			},
+			"isMobile": false,
+			"isSway": false,
+			"clockState": 0,
+			"devMode": false,
+			"visualizer": true,
+			"charOverride": nil,
+			"isUwu": false,
+			"options": map[string]interface{}{
+				"notifications": true, "trackNotif": true, "hintsNotif": true,
+				"notifDuration": 5000, "marqueeSpeed": "normal", "notifPosition": "tl",
+				"expie": false, "timebar": true,
+			},
+			"nativeDir": "",
+		}
+		saveConfig(config)
+	}
+	return config
+}
+
+func saveConfig(config AppConfig) {
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		log.Println("Error marshaling config:", err)
+		return
+	}
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		log.Println("Error writing svmp.conf:", err)
+	}
+}
+
+func main() {
+	execPath, err := os.Executable()
+	if err == nil {
+		configPath = filepath.Join(filepath.Dir(execPath), "svmp.conf")
+	} else {
+		configPath = "svmp.conf"
+	}
+
+	// Setup embedded file server on a random open port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		log.Fatal(err)
+	}
+	localServerPort = fmt.Sprintf("%d", listener.Addr().(*net.TCPAddr).Port)
+
+	go startServer(listener)
+	// give it a sec to start
+	time.Sleep(200 * time.Millisecond)
+
+	debug := true
+	w = webview.New(debug)
+	defer w.Destroy()
+
+	w.SetTitle("SvMP")
+	w.SetSize(900, 700, webview.HintNone)
+
+	homeDir, _ := os.UserHomeDir()
+	currentBrowserPath = filepath.Join(homeDir, "Music")
+
+	w.Bind("goGetDefaultDir", func() string {
+		return filepath.Join(homeDir, "Music")
+	})
+
+	w.Bind("goOpenDirBrowser", func(startingPath string) {
+		if startingPath != "" {
+			currentBrowserPath = startingPath
+		}
+		listDirectory(currentBrowserPath)
+	})
+
+	w.Bind("goNavigateDir", func(name string) {
+		if name == ".." {
+			currentBrowserPath = filepath.Dir(currentBrowserPath)
+		} else {
+			currentBrowserPath = filepath.Join(currentBrowserPath, name)
+		}
+		listDirectory(currentBrowserPath)
+	})
+
+	w.Bind("goSelectDir", func(path string) {
+		selectedMusicDir = path
+		log.Println("Selected directory:", selectedMusicDir)
+		go scanAndWatchDirectory(selectedMusicDir)
+	})
+
+	w.Bind("goSaveConfig", func(configJSON string) {
+		var config AppConfig
+		if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+			log.Println("Error unmarshaling config from JS:", err)
+			return
+		}
+		saveConfig(config)
+	})
+
+	config := loadConfig()
+	configBytes, _ := json.Marshal(config)
+
+	w.Bind("goUpdateMprisStatus", func(status string) {
+		updateMprisStatus(status)
+	})
+
+	w.Bind("goUpdateMprisMetadata", func(title, artist, path string) {
+		updateMprisMetadata(title, artist, path)
+	})
+
+	w.Bind("goUpdateMprisPosition", func(seconds float64) {
+		posMicroseconds := int64(seconds * 1000000)
+		updateMprisPosition(posMicroseconds)
+	})
+
+	w.Bind("goUpdateMprisSeeked", func(seconds float64) {
+		posMicroseconds := int64(seconds * 1000000)
+		updateMprisSeeked(posMicroseconds)
+	})
+
+	initMpris()
+
+	// Inject the initial config into the window object
+	initJS := fmt.Sprintf("window.__INITIAL_CONFIG__ = %s;", string(configBytes))
+	w.Init(initJS)
+
+	w.Navigate(fmt.Sprintf("http://127.0.0.1:%s/player.html", localServerPort))
+	w.Run()
+}
+
+func startServer(listener net.Listener) {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Serve static files from current directory
+		http.ServeFile(w, r, filepath.Join(".", r.URL.Path))
+	})
+
+	http.HandleFunc("/audio/", func(w http.ResponseWriter, r *http.Request) {
+		// Serve audio files from local filesystem
+		path := r.URL.Query().Get("path")
+		if path == "" {
+			http.Error(w, "Missing path", http.StatusBadRequest)
+			return
+		}
+		// Security: Only allow serving files from the selected music directory
+		cleanPath := filepath.Clean(path)
+		if selectedMusicDir == "" || !strings.HasPrefix(filepath.ToSlash(cleanPath), filepath.ToSlash(selectedMusicDir)) {
+			http.Error(w, "Access Denied", http.StatusForbidden)
+			return
+		}
+		http.ServeFile(w, r, path)
+	})
+
+	http.HandleFunc("/art", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Query().Get("path")
+		if path == "" {
+			http.Error(w, "Missing path", http.StatusBadRequest)
+			return
+		}
+
+		cleanPath := filepath.Clean(path)
+		if selectedMusicDir == "" || !strings.HasPrefix(filepath.ToSlash(cleanPath), filepath.ToSlash(selectedMusicDir)) {
+			http.Error(w, "Access Denied", http.StatusForbidden)
+			return
+		}
+
+		f, err := os.Open(path)
+		if err != nil {
+			http.Error(w, "File not found", http.StatusNotFound)
+			return
+		}
+		defer f.Close()
+
+		m, err := tag.ReadFrom(f)
+		if err != nil {
+			http.Error(w, "No tags", http.StatusNotFound)
+			return
+		}
+
+		pic := m.Picture()
+		if pic == nil {
+			http.Error(w, "No artwork", http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", pic.MIMEType)
+		w.Write(pic.Data)
+	})
+
+	log.Println("Starting server on", listener.Addr().String())
+	if err := http.Serve(listener, nil); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func listDirectory(path string) {
+	files, err := os.ReadDir(path)
+	if err != nil {
+		log.Println("Error reading dir:", err)
+		return
+	}
+
+	var items []FileItem
+	for _, f := range files {
+		if strings.HasPrefix(f.Name(), ".") {
+			continue
+		}
+		items = append(items, FileItem{
+			Name:  f.Name(),
+			IsDir: f.IsDir(),
+		})
+	}
+
+	itemsJSON, _ := json.Marshal(items)
+	js := fmt.Sprintf("window.goUpdateDirList(%q, %s);", path, itemsJSON)
+	w.Dispatch(func() {
+		w.Eval(js)
+	})
+}
+
+func isAudioFile(name string) bool {
+	ext := strings.ToLower(filepath.Ext(name))
+	switch ext {
+	case ".mp3", ".flac", ".wav", ".ogg", ".m4a":
+		return true
+	}
+	return false
+}
+
+func parseTrackInfo(path string) TrackInfo {
+	info := TrackInfo{
+		Src:          fmt.Sprintf("http://127.0.0.1:%s/audio/?path=%s", localServerPort, url.QueryEscape(filepath.ToSlash(path))),
+		OriginalName: filepath.Base(path),
+		OriginalPath: path,
+	}
+
+	f, err := os.Open(path)
+	if err == nil {
+		defer f.Close()
+		m, err := tag.ReadFrom(f)
+		if err == nil {
+			info.Title = m.Title()
+			info.Artist = m.Artist()
+		}
+	}
+	return info
+}
+
+var watcher *fsnotify.Watcher
+
+func scanAndWatchDirectory(root string) {
+	// Clear existing playlist in JS
+	w.Dispatch(func() {
+		w.Eval("window.liveClearPlaylist();")
+	})
+
+	if watcher != nil {
+		watcher.Close()
+	}
+	var err error
+	watcher, err = fsnotify.NewWatcher()
+	if err != nil {
+		log.Println("fsnotify error:", err)
+		return
+	}
+
+	// Walk dir to add all initial files and set up watches
+	var initialTracks []TrackInfo
+	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			watcher.Add(path)
+			return nil
+		}
+		if isAudioFile(path) {
+			initialTracks = append(initialTracks, parseTrackInfo(path))
+		}
+		return nil
+	})
+	if err != nil {
+		log.Println("WalkDir error:", err)
+	}
+	if len(initialTracks) > 0 {
+		b, _ := json.Marshal(initialTracks)
+		js := fmt.Sprintf("window.liveAddTracks(%s);", string(b))
+		w.Dispatch(func() {
+			w.Eval(js)
+		})
+	}
+
+	// Watch loop
+	go func() {
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				if event.Has(fsnotify.Create) {
+					info, err := os.Stat(event.Name)
+					if err == nil && info.IsDir() {
+						// Add new directory to watcher and scan it recursively
+						var newTracks []TrackInfo
+						err = filepath.WalkDir(event.Name, func(path string, d fs.DirEntry, err error) error {
+							if err != nil {
+								return err
+							}
+							if d.IsDir() {
+								watcher.Add(path)
+								return nil
+							}
+							if isAudioFile(path) {
+								newTracks = append(newTracks, parseTrackInfo(path))
+							}
+							return nil
+						})
+						if err != nil {
+							log.Println("WalkDir on new dir error:", err)
+						}
+						if len(newTracks) > 0 {
+							b, _ := json.Marshal(newTracks)
+							js := fmt.Sprintf("window.liveAddTracks(%s);", string(b))
+							w.Dispatch(func() {
+								w.Eval(js)
+							})
+						}
+					} else if isAudioFile(event.Name) {
+						pushTrackToJS(event.Name)
+					}
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Println("watcher error:", err)
+			}
+		}
+	}()
+}
+
+func pushTrackToJS(path string) {
+	info := parseTrackInfo(path)
+	b, _ := json.Marshal(info)
+	js := fmt.Sprintf("window.liveAddTrack(%s);", string(b))
+	w.Dispatch(func() {
+		w.Eval(js)
+	})
+}

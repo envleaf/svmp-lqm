@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>SvMP</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="svmp.png">
+
+    <meta property="og:title" content="SvMP" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://envleaf.com/player.html" />
+    <meta property="og:description" content="envleaf audio share" />
+    <meta name="theme-color" content="#050505">
+    <meta name="twitter:card" content="summary">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;700&display=swap');
+
+        :root {
+            --bg-color: #050505;
+            --text-color: #d4d4d4;
+            --prompt-color: #888888;
+        }
+
+        /* FX Themes */
+        html.theme-amber { --text-color: #ffb000; --prompt-color: #aa7700; }
+        html.theme-green { --text-color: #55ff55; --prompt-color: #22aa22; }
+        html.theme-cyan { --text-color: #55ffff; --prompt-color: #00aaaa; }
+        html.theme-red { --text-color: #ff5555; --prompt-color: #aa2222; }
+        html.theme-blue { --text-color: #5555ff; --prompt-color: #2222aa; }
+        html.theme-magenta { --text-color: #ff55ff; --prompt-color: #aa22aa; }
+        html.theme-yellow { --text-color: #ffff55; --prompt-color: #aaaa22; }
+        html.theme-synthwave { --text-color: #ff00ff; --prompt-color: #00ffff; }
+        html.theme-sunset { --text-color: #ffaa00; --prompt-color: #ff00aa; }
+        html.theme-monokai { --text-color: #a6e22e; --prompt-color: #f92672; }
+        html.theme-dracula { --text-color: #ff79c6; --prompt-color: #50fa7b; }
+        html.theme-gruvbox { --text-color: #fabd2f; --prompt-color: #fe8019; }
+        html.theme-nord { --text-color: #88c0d0; --prompt-color: #81a1c1; }
+        html.theme-solarized { --text-color: #268bd2; --prompt-color: #2aa198; }
+        html.theme-neon { --text-color: #00ffcc; --prompt-color: #ff00ff; }
+
+        html.theme-kawaii {
+            --bg-color: #1a0a13 !important;
+            --text-color: #ff99cc !important;
+            --prompt-color: #ff4da6 !important;
+        }
+
+        html {
+            background-color: var(--bg-color);
+            min-height: 100vh;
+        }
+
+        body {
+            background-color: transparent;
+            color: var(--text-color);
+            font-family: 'Source Code Pro', monospace;
+            line-height: 1.6;
+            margin: 0;
+            padding: 40px 20px;
+            position: relative;
+            overflow-x: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 80vh;
+            transition: color 0.3s ease;
+            text-align: center;
+        }
+
+        .star {
+            position: fixed;
+            background-color: var(--text-color);
+            border-radius: 50%;
+            z-index: -1;
+            animation: twinkle linear infinite;
+        }
+
+        html.theme-kawaii .star {
+            background-color: #ffb3d9 !important;
+            box-shadow: 0 0 5px #ffb3d9;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 0.1; }
+        }
+
+        #ascii-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: -2; color: var(--prompt-color); opacity: 0.15;
+            font-size: 14px; line-height: 14px; overflow: hidden;
+            user-select: none; white-space: pre; pointer-events: none;
+        }
+
+        /* --- FX Modes --- */
+        @keyframes rgbCycle {
+            0%   { color: #ff5555; border-color: #ff5555; text-shadow: 0 0 5px #ff555555; }
+            20%  { color: #ffff55; border-color: #ffff55; text-shadow: 0 0 5px #ffff5555; }
+            40%  { color: #55ff55; border-color: #55ff55; text-shadow: 0 0 5px #55ff5555; }
+            60%  { color: #55ffff; border-color: #55ffff; text-shadow: 0 0 5px #55ffff55; }
+            80%  { color: #aa55ff; border-color: #aa55ff; text-shadow: 0 0 5px #aa55ff55; }
+            100% { color: #ff5555; border-color: #ff5555; text-shadow: 0 0 5px #ff555555; }
+        }
+        body.rgb-mode * { animation: rgbCycle 4s linear infinite !important; }
+        body.rgb-mode .star { background-color: currentColor !important; }
+        html.invert-mode { filter: invert(1); }
+
+        body.crt-mode::after {
+            content: " "; display: block; position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 3px, 3px 100%; z-index: 9999; pointer-events: none;
+        }
+
+        @keyframes maxTripAnim {
+            0%   { filter: hue-rotate(0deg) contrast(200%) saturate(200%); transform: scale(1) rotate(0deg); }
+            25%  { filter: hue-rotate(90deg) contrast(300%) saturate(300%); transform: scale(1.02) rotate(1deg) skewX(2deg); }
+            50%  { filter: hue-rotate(180deg) contrast(150%) saturate(400%); transform: scale(0.98) rotate(-1deg) skewY(-2deg); }
+            75%  { filter: hue-rotate(270deg) contrast(400%) saturate(300%); transform: scale(1.05) rotate(2deg) skewX(-2deg); }
+            100% { filter: hue-rotate(360deg) contrast(200%) saturate(200%); transform: scale(1) rotate(0deg); }
+        }
+        body.max-trip-mode { animation: maxTripAnim 0.2s infinite alternate ease-in-out !important; }
+        body.max-trip-mode #ascii-bg {
+            opacity: 0.8 !important; animation: maxTripAnim 0.1s infinite !important;
+            color: #ffffff !important; font-weight: bold;
+        }
+
+
+        /* --- Custom Clock --- */
+        #clock-display { display: none; pointer-events: none; user-select: none; }
+        body.clock-small #clock-display {
+            display: block; position: fixed; top: 20px; right: 20px;
+            color: var(--prompt-color); z-index: 100000;
+        }
+        body.clock-full #clock-display {
+            display: flex; justify-content: center; align-items: center;
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            color: var(--text-color); font-size: 15vw; z-index: 100000;
+        }
+        body.clock-full .player-container,
+        body.clock-full #scp-text,
+        body.clock-full .overlay-modal {
+            display: none !important;
+        }
+
+        /* --- Easter Eggs --- */
+        @keyframes rmrfDrop {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(15deg); opacity: 0; }
+        }
+        body.rmrf-mode .player-container { animation: rmrfDrop 2s forwards; pointer-events: none; }
+
+        #scp-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: #000; z-index: 99999; display: none; pointer-events: none;
+        }
+        body.scp-mode.blinking #scp-overlay { display: block; }
+        #scp-text {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            color: #ff5555; font-weight: bold; z-index: 99998; display: none; pointer-events: none;
+        }
+        body.scp-mode #scp-text { display: block; }
+
+        /* --- Tiling Window Managers (Sway / Mobile) --- */
+        body.sway-mode, body.mobile-mode { align-items: flex-start; padding-top: 5vh; }
+        body.sway-mode .player-container {
+            max-width: 95vw; display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 15px; align-items: stretch;
+        }
+        body.mobile-mode .player-container { max-width: 100%; display: flex; flex-direction: column; gap: 15px; }
+        body.sway-mode #music-ui, body.mobile-mode #music-ui {
+            grid-column: 1 / -1; border: 1px dashed var(--prompt-color);
+            padding: 20px; background: rgba(0,0,0,0.6);
+        }
+        body.sway-mode .menu-box {
+            display: block !important; border: 1px dashed var(--prompt-color);
+            padding: 15px; background: rgba(0,0,0,0.6); height: 320px;
+            margin-top: 0; overflow-y: auto;
+        }
+        body.mobile-mode .menu-box {
+            display: block !important; border: 1px dashed var(--prompt-color);
+            padding: 15px; background: rgba(0,0,0,0.6); max-height: 400px;
+            margin-top: 0; overflow-y: auto;
+        }
+        body.sway-mode #action-row, body.sway-mode hr.section-line,
+        body.mobile-mode #action-row, body.mobile-mode hr.section-line { display: none !important; }
+        body.sway-mode .menu-box > pre:first-child, body.mobile-mode .menu-box > pre:first-child {
+            position: sticky; top: -15px; background: var(--bg-color);
+            margin: -15px -15px 10px -15px; padding: 10px 15px;
+            border-bottom: 1px dashed var(--prompt-color); z-index: 10;
+        }
+
+        /* --- Modals --- */
+        .overlay-modal {
+            display: none; position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); background: rgba(5, 5, 5, 0.98);
+            border: 1px solid var(--prompt-color); padding: 30px;
+            z-index: 10000; box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            max-width: 90vw; max-height: 90vh; overflow-y: auto;
+        }
+
+        /* --- Base Layout --- */
+        .player-container { width: 100%; max-width: 700px; position: relative; z-index: 1; margin: 0 auto; }
+        #music-ui { display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .music-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; align-items: center; }
+        p { margin-bottom: 1.5em; }
+        a {
+            color: var(--text-color); text-decoration: underline;
+            text-decoration-style: dashed; text-underline-offset: 4px; transition: all 0.2s ease;
+        }
+        a:hover { text-decoration-style: solid; }
+
+        #ascii-progress-container {
+            display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px;
+            font-size: 0.8em; color: var(--prompt-color); margin-bottom: 0.5em; user-select: none; width: 100%;
+        }
+        #ascii-bar, #vol-bar { cursor: pointer; color: var(--text-color); letter-spacing: 1px; }
+
+        #live-visualizer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100vw;
+            height: 25vh;
+            z-index: -1;
+            opacity: 0.3;
+            mix-blend-mode: screen;
+            pointer-events: none;
+        }
+
+        .menu-box { display: none; font-size: 0.9em; color: var(--prompt-color); margin-top: 0.5em; line-height: 1.5; text-align: left; }
+        .menu-box.scrollable { max-height: 250px; overflow-y: auto; overflow-x: hidden; }
+        .menu-box::-webkit-scrollbar { width: 6px; }
+        .menu-box::-webkit-scrollbar-thumb { background: var(--prompt-color); border-radius: 4px; }
+
+        input[type="text"] {
+            background: transparent; border: none; border-bottom: 1px dashed var(--prompt-color);
+            color: var(--text-color); font-family: 'Source Code Pro', monospace; font-size: 1em;
+            outline: none; width: 100%; margin-bottom: 10px;
+        }
+        input[type="text"]:focus { border-bottom: 1px solid var(--text-color); }
+        hr.section-line { border: 0; border-bottom: 1px dashed var(--prompt-color); margin: 2em 0; width: 100%; }
+
+        body.focus-mode .focus-hide { display: none !important; }
+        #music-unfocus { display: none; }
+        body.focus-mode #music-unfocus { display: inline-block !important; }
+
+        /* FX Grid System */
+        .fx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 15px; margin-top: 0.5em; }
+        .fx-col { display: flex; flex-direction: column; gap: 4px; }
+        .fx-toggle { text-decoration: none; }
+
+/* cmd-palette styles removed from here, as it's built in app.js and we added cmd-output there. Actually app.js creates the element dynamically, so we can keep this for the style */
+#cmd-palette {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(5, 5, 5, 0.98);
+    border: 1px dashed var(--prompt-color);
+    padding: 20px;
+    z-index: 100000;
+    box-shadow: 0 0 20px rgba(0,0,0,0.8);
+    width: 300px;
+}
+
+#cmd-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--text-color);
+    color: var(--text-color);
+    font-family: 'Source Code Pro', monospace;
+    font-size: 1em;
+    outline: none;
+}
+
+#cmd-output {
+    margin-top: 10px;
+    margin-bottom: 0;
+    color: var(--prompt-color);
+    font-size: 0.9em;
+    white-space: pre-wrap;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+/* Notification System */
+#notification-container {
+    position: fixed;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none; /* Let clicks pass through if needed */
+}
+
+#notification-container.pos-tl { top: 20px; left: 20px; }
+#notification-container.pos-tr { top: 20px; right: 20px; align-items: flex-end; }
+#notification-container.pos-bl { bottom: 20px; left: 20px; }
+#notification-container.pos-br { bottom: 20px; right: 20px; align-items: flex-end; }
+
+.notification-item {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    border: 1px solid var(--text-color);
+    padding: 10px 15px;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 0.9rem;
+    box-shadow: 2px 2px 0 var(--text-color);
+    opacity: 0;
+    pointer-events: auto; /* Required to receive contextmenu events */
+}
+
+/* Slide in from left for TL/BL */
+#notification-container.pos-tl .notification-item,
+#notification-container.pos-bl .notification-item {
+    transform: translateX(-30px);
+    animation: notify-slide-in-left 0.3s forwards ease-out;
+}
+
+#notification-container.pos-tl .notification-item.fade-out,
+#notification-container.pos-bl .notification-item.fade-out {
+    animation: notify-slide-out-left 0.4s forwards ease-in;
+}
+
+/* Slide in from right for TR/BR */
+#notification-container.pos-tr .notification-item,
+#notification-container.pos-br .notification-item {
+    transform: translateX(30px);
+    animation: notify-slide-in-right 0.3s forwards ease-out;
+}
+
+#notification-container.pos-tr .notification-item.fade-out,
+#notification-container.pos-br .notification-item.fade-out {
+    animation: notify-slide-out-right 0.4s forwards ease-in;
+}
+
+@keyframes notify-slide-in-left {
+    0% { opacity: 0; transform: translateX(-30px); }
+    100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes notify-slide-out-left {
+    0% { opacity: 1; transform: translateX(0); }
+    100% { opacity: 0; transform: translateX(-30px); }
+}
+
+@keyframes notify-slide-in-right {
+    0% { opacity: 0; transform: translateX(30px); }
+    100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes notify-slide-out-right {
+    0% { opacity: 1; transform: translateX(0); }
+    100% { opacity: 0; transform: translateX(30px); }
+}
+</style>
+</head>
+<body>
+
+<canvas id="timebar-canvas" style="position: fixed; top: 0; left: 0; width: 100%; height: 5px; z-index: 999999; pointer-events: none;"></canvas>
+<div id="notification-container"></div>
+<div id="ascii-bg"></div>
+<canvas id="live-visualizer"></canvas>
+<div id="star-container"></div>
+<img id="expie-img" src="expie.png" style="display: none; position: fixed; bottom: 0; z-index: 999998;">
+<div id="scp-overlay"></div>
+<p id="scp-text" class="focus-hide">[press left click to blink]</p>
+<div id="clock-display"></div>
+
+<div id="welcome-modal" class="overlay-modal">
+<pre style="margin: 0; color: var(--text-color);">
++-- welcome to SvMP --------------------+
+|                                       |
+|  this is a simple audio player        |
+|  that runs in your browser.           |
+|  Local files will stay in your        |
+|  browser's ram and are cleared on     |
+|  refresh.                             |
+|                                       |
+|  -> set track dir under [opt +]       |
+|  -> get track info using [info]       |
+|  -> search index in [search +]        |
+|  -> customize via [fx +]              |
+|                                       |
+|  press [/] to view all keybinds.      |
+|  press [esc] to close menus.          |
++---------------------------------------+</pre>
+    <p style="text-align: center; margin-top: 20px;"><a href="#" id="close-welcome">[start]</a></p>
+</div>
+
+<div id="keybind-modal" class="overlay-modal focus-hide">
+<pre style="margin: 0; color: var(--text-color);">
++-- system keybinds --------------------+
+|                                       |
+|  [Space]   play/pause                 |
+|  [Arrows]  skip back/forward          |
+|  [R]       restart track              |
+|  [Shift+R] random track               |
+|  [-, =]    volume down/up             |
+|  [7, 8]    seek -5s / +5s             |
+|                                       |
+|  [0]       toggle focus mode          |
+|  [1]       toggle visualizer          |
+|  [2]       toggle 24hr clock          |
+|  [3]       open track info            |
+|  [4]       toggle audio mute          |
+|  [6]       toggle deckmode (sway)     |
+|                                       |
+|  [Esc]     close all menus/modals     |
+|  [/]       toggle this menu           |
++---------------------------------------+</pre>
+</div>
+
+<div class="player-container">
+        <audio id="audio-local"></audio>
+
+    <div id="music-ui">
+        <p style="font-size: 0.8em; color: var(--prompt-color); margin-bottom: 0.8em;">
+            now playing: <br>
+            <span id="track-title" style="color: var(--text-color);">loading...</span>
+        </p>
+
+        <p class="music-controls" style="margin-bottom: 0.5em; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+            <a href="#" id="music-prev">[&lt;&lt;]</a>
+            <a href="#" id="music-toggle">[play]</a>
+            <a href="#" id="music-next">[&gt;&gt;]</a>
+            <a href="#" id="music-lists" class="focus-hide">[lists]</a>
+            <a href="#" id="music-shuffle" class="focus-hide">[shuffle ( )]</a>
+            <a href="#" id="music-info" class="focus-hide">[info]</a>
+            <a href="#" id="music-fav" class="focus-hide">[fav ( )]</a>
+
+            <a href="#" id="music-unfocus">[unfocus]</a>
+        </p>
+
+        <div id="ascii-progress-container" class="focus-hide">
+            <span id="time-current">0:00</span>
+            <span id="ascii-bar">[--------------------]</span>
+            <span id="time-total">0:00</span>
+            <span style="margin-left: 5px;">vol:</span>
+            <span id="vol-bar">[|||||.....]</span>
+        </div>
+
+        <p style="font-size: 0.7em; color: var(--prompt-color); margin-top: 0.5em;" id="playlist-status-text" class="focus-hide"></p>
+    </div>
+
+    <p style="margin-top: 1.5em; margin-bottom: 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center;" id="action-row" class="focus-hide">
+        <a href="#" id="music-index" class="menu-toggle" data-target="index-box">[index +]</a>
+        <a href="#" id="music-queue" class="menu-toggle" data-target="queue-box">[queue +]</a>
+        <a href="#" id="music-playlist" class="menu-toggle" data-target="playlist-box" style="display: none;">[playlist +]</a>
+        <a href="#" id="music-search" class="menu-toggle" data-target="search-box">[search +]</a>
+        <a href="#" id="music-lyrics" class="menu-toggle" data-target="lyrics-box">[lyrics +]</a>
+        <a href="#" id="music-eq" class="menu-toggle" data-target="eq-box">[eq +]</a>
+        <a href="#" id="music-fx" class="menu-toggle" data-target="fx-box">[fx +]</a>
+        <a href="#" id="music-opt" class="menu-toggle" data-target="opt-box">[opt +]</a>
+    </p>
+
+<div id="index-box" class="menu-box scrollable focus-hide">
+<pre style="margin: 0;">+-- global index -----------------------+</pre>
+    <div id="index-results" style="margin-top: 0.5em; margin-bottom: 0; line-height: 1.8;"></div>
+</div>
+
+<div id="queue-box" class="menu-box scrollable focus-hide">
+<pre style="margin: 0;">+-- play queue -------------------------+</pre>
+    <div id="queue-results" style="margin-top: 0.5em; margin-bottom: 0; line-height: 1.8;"></div>
+</div>
+
+<div id="playlist-box" class="menu-box scrollable focus-hide">
+<pre style="margin: 0;">
++-- custom playlist builder ------------+
+| input tracks (e.g. 1,5,9,10-17)       |</pre>
+    <input type="text" id="playlist-input" placeholder="enter tracks here..." spellcheck="false" autocomplete="off">
+    <p style="margin-top: 0.5em; margin-bottom: 0;">
+        <a href="#" id="playlist-load">[load]</a>
+        <a href="#" id="playlist-clear" style="margin-left: 10px;">[clear]</a>
+    </p>
+    <pre id="custom-index-box" style="margin-top: 1em; margin-bottom: 0;"></pre>
+</div>
+
+<div id="search-box" class="menu-box scrollable focus-hide">
+<pre style="margin: 0;">+-- track search -----------------------+</pre>
+    <input type="text" id="search-input" placeholder="search active queue..." spellcheck="false" autocomplete="off" style="margin-top:0.5em;">
+    <div id="search-results" style="margin-top: 0.5em; margin-bottom: 0; line-height: 1.8;"></div>
+</div>
+
+<div id="lyrics-box" class="menu-box scrollable focus-hide">
+<pre style="margin: 0; white-space: pre-wrap;" id="lyrics-content">waiting for track...</pre>
+</div>
+
+<div id="eq-box" class="menu-box focus-hide">
+<pre style="margin: 0;">+-- audio equalizer --------------------+</pre>
+<pre style="margin: 0; font-size: 0.8em; color: #555;">(applies to local files only)</pre>
+    <div class="fx-grid" style="margin-top: 1em;">
+        <div class="fx-col" style="gap: 10px;">
+            <div>
+                <strong style="color: var(--text-color); display: inline-block; width: 60px;">bass:</strong>
+                <a href="#" class="eq-btn" data-eq="bass" data-dir="-1">[&lt;]</a> <span id="eq-bass-bar">[|||||.....]</span> <a href="#" class="eq-btn" data-eq="bass" data-dir="1">[&gt;]</a>
+            </div>
+            <div>
+                <strong style="color: var(--text-color); display: inline-block; width: 60px;">mid:</strong>
+                <a href="#" class="eq-btn" data-eq="mid" data-dir="-1">[&lt;]</a> <span id="eq-mid-bar">[|||||.....]</span> <a href="#" class="eq-btn" data-eq="mid" data-dir="1">[&gt;]</a>
+            </div>
+            <div>
+                <strong style="color: var(--text-color); display: inline-block; width: 60px;">treble:</strong>
+                <a href="#" class="eq-btn" data-eq="treble" data-dir="-1">[&lt;]</a> <span id="eq-treble-bar">[|||||.....]</span> <a href="#" class="eq-btn" data-eq="treble" data-dir="1">[&gt;]</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="fx-box" class="menu-box scrollable focus-hide">
+<pre style="margin: 0;">+-- visual engine ----------------------+</pre>
+    <div class="fx-grid" id="standard-fx">
+        <div class="fx-col">
+            <strong style="color: var(--text-color);">themes</strong>
+            <a href="#" class="fx-toggle" data-fx="theme-default">[x] monochrome</a>
+            <a href="#" class="fx-toggle" data-fx="theme-amber">[ ] amber</a>
+            <a href="#" class="fx-toggle" data-fx="theme-green">[ ] hacker</a>
+            <a href="#" class="fx-toggle" data-fx="theme-cyan">[ ] cyanide</a>
+            <a href="#" class="fx-toggle" data-fx="theme-red">[ ] red diode</a>
+            <a href="#" class="fx-toggle" data-fx="theme-blue">[ ] deep blue</a>
+            <a href="#" class="fx-toggle" data-fx="theme-magenta">[ ] magenta</a>
+            <a href="#" class="fx-toggle" data-fx="theme-yellow">[ ] yellow</a>
+            <a href="#" class="fx-toggle" data-fx="theme-synthwave">[ ] synthwave</a>
+            <a href="#" class="fx-toggle" data-fx="theme-sunset">[ ] sunset</a>
+            <a href="#" class="fx-toggle" data-fx="theme-monokai">[ ] monokai</a>
+            <a href="#" class="fx-toggle" data-fx="theme-dracula">[ ] dracula</a>
+            <a href="#" class="fx-toggle" data-fx="theme-gruvbox">[ ] gruvbox</a>
+            <a href="#" class="fx-toggle" data-fx="theme-nord">[ ] nord</a>
+            <a href="#" class="fx-toggle" data-fx="theme-solarized">[ ] solarized</a>
+            <a href="#" class="fx-toggle" data-fx="theme-neon">[ ] neon</a>
+        </div>
+        <div class="fx-col">
+            <strong style="color: var(--text-color);">backgrounds</strong>
+            <a href="#" class="fx-toggle" data-fx="bg-plasma">[x] plasma</a>
+            <a href="#" class="fx-toggle" data-fx="bg-mountains">[ ] mountains</a>
+            <a href="#" class="fx-toggle" data-fx="bg-ocean">[ ] ocean</a>
+            <a href="#" class="fx-toggle" data-fx="bg-hyperspace">[ ] hyperspace</a>
+            <a href="#" class="fx-toggle" data-fx="bg-fire">[ ] fire</a>
+            <a href="#" class="fx-toggle" data-fx="bg-rain">[ ] storm</a>
+            <a href="#" class="fx-toggle" data-fx="bg-wave">[ ] wave</a>
+            <a href="#" class="fx-toggle" data-fx="bg-snow">[ ] snow</a>
+            <a href="#" class="fx-toggle" data-fx="bg-ripple">[ ] ripple</a>
+            <a href="#" class="fx-toggle" data-fx="bg-sparkle">[ ] sparkle</a>
+            <a href="#" class="fx-toggle" data-fx="bg-matrix">[ ] matrix</a>
+            <a href="#" class="fx-toggle" data-fx="bg-grid">[ ] grid</a>
+            <a href="#" class="fx-toggle" data-fx="bg-dna">[ ] dna</a>
+            <a href="#" class="fx-toggle" data-fx="bg-stars">[ ] stars</a>
+            <a href="#" class="fx-toggle" data-fx="bg-static">[ ] static</a>
+            <a href="#" class="fx-toggle" data-fx="bg-none">[ ] none</a>
+        </div>
+        <div class="fx-col">
+            <strong style="color: var(--text-color);">special</strong>
+            <a href="#" class="fx-toggle" data-fx="rgb">[ ] rgb shift</a>
+            <a href="#" class="fx-toggle" data-fx="crt">[ ] crt scanlines</a>
+            <a href="#" class="fx-toggle" data-fx="invert">[ ] invert colors</a>
+            <a href="#" class="fx-toggle" data-fx="obfuscate">[ ] obfuscate</a>
+            <br>
+            <strong style="color: var(--prompt-color);">overrides</strong>
+            <a href="#" class="fx-toggle" data-fx="kawaii" style="color: #ff99cc;">[ ] kawaii</a>
+            <a href="#" class="fx-toggle" data-fx="maxTrip" style="color: #ff5555;">[ ] max trip (LAG)</a>
+        </div>
+    </div>
+</div>
+
+<div id="opt-box" class="menu-box focus-hide">
+<pre style="margin: 0;">+-- options ----------------------------+</pre>
+    <div class="fx-grid" style="margin-top: 1em;">
+        <div class="fx-col">
+            <strong style="color: var(--text-color);">Music Folder Location</strong>
+            <a href="#" id="music-dl-add" class="focus-hide">[add files]</a>
+
+            <strong style="color: var(--text-color); margin-top: 10px; display: block;">timebar</strong>
+            <div>
+                <a href="#" class="opt-toggle" data-opt="timebar" data-val="true">[x] on</a>
+                <a href="#" class="opt-toggle" data-opt="timebar" data-val="false">[ ] off</a>
+            </div>
+        </div>
+        <div class="fx-col">
+            <strong style="color: var(--text-color);">master notifications</strong>
+            <div>
+                <a href="#" class="opt-toggle" data-opt="notifications" data-val="true">[x] on</a>
+                <a href="#" class="opt-toggle" data-opt="notifications" data-val="false">[ ] off</a>
+            </div>
+            
+            <strong style="color: var(--text-color); margin-top: 10px;">notification position</strong>
+            <a href="#" id="opt-notif-pos">[pos: topleft]</a>
+            
+            <strong style="color: var(--text-color); margin-top: 10px;">song change notifications</strong>
+            <div>
+                <a href="#" class="opt-toggle" data-opt="trackNotif" data-val="true">[x] on</a>
+                <a href="#" class="opt-toggle" data-opt="trackNotif" data-val="false">[ ] off</a>
+            </div>
+            
+            <strong style="color: var(--text-color); margin-top: 10px;">hints</strong>
+            <div>
+                <a href="#" class="opt-toggle" data-opt="hintsNotif" data-val="true">[x] on</a>
+                <a href="#" class="opt-toggle" data-opt="hintsNotif" data-val="false">[ ] off</a>
+            </div>
+        </div>
+        <div class="fx-col">
+            <strong style="color: var(--text-color);">notification duration</strong>
+            <div>
+                <a href="#" class="opt-toggle" data-opt="notifDuration" data-val="1000">[ ] 1s</a>
+                <a href="#" class="opt-toggle" data-opt="notifDuration" data-val="5000">[x] 5s</a>
+                <a href="#" class="opt-toggle" data-opt="notifDuration" data-val="10000">[ ] 10s</a>
+            </div>
+            
+            <strong style="color: var(--text-color); margin-top: 10px;">marquee speed</strong>
+            <div>
+                <a href="#" class="opt-toggle" data-opt="marqueeSpeed" data-val="slow">[ ] slow</a>
+                <a href="#" class="opt-toggle" data-opt="marqueeSpeed" data-val="normal">[x] normal</a>
+                <a href="#" class="opt-toggle" data-opt="marqueeSpeed" data-val="fast">[ ] fast</a>
+            </div>
+            
+            <strong style="color: var(--text-color); margin-top: 10px;">live visualizer</strong>
+            <div>
+                <a href="#" class="opt-toggle" data-opt="visualizer" data-val="true">[x] on</a>
+                <a href="#" class="opt-toggle" data-opt="visualizer" data-val="false">[ ] off</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <input type="file" id="local-file-input" accept="audio/*" multiple style="display: none;">
+    <input type="file" id="local-folder-input" accept="audio/*" webkitdirectory directory multiple style="display: none;">
+</div>
+
+<!-- Directory Browser Modal -->
+<div id="dir-browser-modal" class="overlay-modal" style="display: none; padding: 20px; z-index: 10001; text-align: left; background: var(--bg-color); border: 1px solid var(--text-color); box-shadow: 4px 4px 0 var(--text-color); min-width: 400px; max-height: 80vh; overflow: hidden; flex-direction: column;">
+<strong style="margin: 0; color: var(--text-color); font-size: 1.2em;">directory browser</strong>
+<p style="margin: 0.5em 0; color: var(--text-color); word-break: break-all;"><strong>path:</strong> <span id="dir-browser-path">/</span></p>
+<div id="dir-browser-list" style="flex-grow: 1; overflow-y: auto; border: 1px dashed var(--prompt-color); padding: 10px; margin-bottom: 10px; color: var(--text-color); line-height: 1.8;">
+    <!-- Items go here -->
+</div>
+<div style="margin: 0; color: var(--text-color); display: flex; gap: 15px;">
+    <a href="#" id="dir-browser-select">[select this directory]</a>
+    <a href="#" id="dir-browser-close">[cancel]</a>
+</div>
+</div>
+
+<!-- Song Info Modal -->
+<div id="song-info-modal" class="overlay-modal" style="display: none; padding: 20px; z-index: 10001; text-align: left; background: var(--bg-color); border: 1px solid var(--text-color); box-shadow: 4px 4px 0 var(--text-color);">
+<strong style="margin: 0; margin-bottom: 15px; display: block; color: var(--text-color); font-size: 1.2em;">track information</strong>
+<div style="display: flex; margin-bottom: 20px;">
+    <div id="song-info-artwork-container" style="width: 120px; height: 120px; border: 1px solid var(--text-color); margin-right: 15px; overflow: hidden; position: relative; flex-shrink: 0;">
+        <img id="song-info-artwork" style="width: 100%; height: 100%; object-fit: cover; display: none;" />
+        <div id="song-info-artwork-placeholder" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">no art</div>
+    </div>
+    <div style="display: flex; flex-direction: column; justify-content: center; color: var(--text-color); overflow: hidden;">
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><strong>title:</strong>   <span id="song-info-title">...</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><strong>artist:</strong>  <span id="song-info-artist">...</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><strong>album:</strong>   <span id="song-info-album">...</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><strong>bitrate:</strong> <span id="song-info-bitrate">...</span></div>
+    </div>
+</div>
+<div style="display: flex; gap: 15px; color: var(--text-color);">
+    <a href="#" id="song-info-play">[play]</a>
+    <a href="#" id="song-info-queue">[add to queue]</a>
+    <a href="#" id="song-info-add-list">[add to list]</a>
+    <a href="#" id="song-info-remove" style="color: #ff5555;">[remove]</a>
+    <a href="#" id="song-info-close">[close]</a>
+</div>
+</div>
+
+<!-- Prompt Modal -->
+<div id="prompt-modal" class="overlay-modal" style="display: none; padding: 20px; z-index: 10005; text-align: left; background: var(--bg-color); border: 1px solid var(--text-color); box-shadow: 4px 4px 0 var(--text-color); min-width: 300px; flex-direction: column;">
+    <strong id="prompt-modal-title" style="margin: 0; color: var(--text-color); font-size: 1.2em;">prompt</strong>
+    <input type="text" id="prompt-modal-input" style="margin-top: 15px; margin-bottom: 15px; width: 100%; box-sizing: border-box;">
+    <div style="display: flex; gap: 15px; color: var(--text-color); justify-content: flex-end;">
+        <a href="#" id="prompt-modal-cancel">[cancel]</a>
+        <a href="#" id="prompt-modal-ok">[ok]</a>
+    </div>
+</div>
+
+<!-- Lists Modal -->
+<div id="lists-modal" class="overlay-modal" style="display: none; padding: 20px; z-index: 10002; text-align: left; background: var(--bg-color); border: 1px solid var(--text-color); box-shadow: 4px 4px 0 var(--text-color); min-width: 400px; max-height: 80vh; overflow: hidden; flex-direction: column;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <strong id="lists-modal-title" style="margin: 0; color: var(--text-color); font-size: 1.2em;">playlists</strong>
+        <div>
+            <a href="#" id="lists-modal-create" style="margin-right: 10px;">[create]</a>
+            <a href="#" id="lists-modal-back" style="display: none; margin-right: 10px;">[back]</a>
+            <a href="#" id="lists-modal-close">[close]</a>
+        </div>
+    </div>
+    <div id="lists-modal-content" style="flex-grow: 1; overflow-y: auto; border: 1px dashed var(--prompt-color); padding: 10px; color: var(--text-color); line-height: 1.8;">
+        <!-- Dynamic content goes here -->
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+<script src="ConfigManager.js"></script>
+<script src="PlaylistManager.js"></script>
+<script src="AudioEngine.js"></script>
+<script src="UIManager.js"></script>
+<script src="cmd.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

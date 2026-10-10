@@ -1,0 +1,154 @@
+/* ========================= */
+/* Font Import               */
+/* ========================= */
+@import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;600;700&display=swap');
+
+:root {
+  --accent-pink: #ffb6c1;
+}
+::selection {
+  background: var(--accent-pink);
+  color: #fff;
+}
+
+/* ========================= */
+/* Base Light Mode            */
+/* ========================= */
+body {
+    background-color: #fbeef3;
+    color: #111;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 1.1rem;
+    transition: background-color 0.4s, color 0.4s;
+}
+
+a {
+    color: var(--accent-pink);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.container {
+    max-width: 700px;
+    margin: 40px auto;
+    padding: 20px;
+    text-align: center;
+    border: 2px solid #ccc;
+    border-radius: 10px;
+}
+
+h1, h2 {
+    font-weight: 700;
+    color: var(--accent-pink);
+    letter-spacing: 0.5px;
+}
+/*dividing line*/
+.section-line {
+    border: 0;
+    border-top: 2px dashed var(--accent-pink);
+    margin: 30px auto;
+    width: 60%;
+    opacity: 0.6;
+}
+
+body.dark-mode .section-line {
+    border-top-color: var(--accent-pink);
+    opacity: 0.8;
+}
+
+
+
+/* ========================= */
+/* Button Styling             */
+/* ========================= */
+.bn11 {
+    display: inline-block;
+    padding: 10px 18px;
+    margin: 6px;
+    border: 2px solid #000;
+    border-radius: 6px;
+    text-decoration: none;
+    font-family: 'Source Code Pro', monospace;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #000;
+    background: var(--accent-pink);
+    box-shadow: 2px 2px 0 #000;
+    transition: all 0.2s ease-in-out;
+}
+
+.bn11:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 #000;
+}
+
+/* ========================= */
+/* Platform highlight colors  */
+/* ========================= */
+a[href*="tutanota"]:hover { background-color: var(--accent-pink); color: #000; border-color: #EB0A1E; }
+a[href*="discord"]:hover { background-color: #5865F2; color: #fff; border-color: #3c45c7; }
+a[href*="bsky"]:hover { background-color: #0285FF; color: #fff; border-color: #005fcc; }
+a[href*="ohai.social"]:hover { background-color: #6364FF; color: #fff; border-color: #4445cc; }
+a[href*="boxd.it"]:hover { background-color: #00D474; color: #fff; border-color: #00995b; }
+a[href*="steamcommunity"]:hover { background-color: #00ADEE; color: #fff; border-color: #018ec2; }
+a[href*="github"]:hover { background-color: #333; color: #fff; border-color: #111; }
+
+/* ========================= */
+/* Dark Mode                 */
+/* ========================= */
+body.dark-mode {
+    background-color: #2b2024;
+    color: #ffffff;
+}
+
+body.dark-mode .container {
+    border-color: var(--accent-pink);
+    box-shadow: 0 0 15px var(--accent-pink);
+}
+a {
+    color: var(--accent-pink);
+}
+
+body.dark-mode h1, body.dark-mode h2 {
+    color: var(--accent-pink);
+}
+
+body.dark-mode .bn11 {
+    border-color: #fff;
+    background-color: transparent;
+    color: #fff;
+    box-shadow: 2px 2px 0 #fff;
+}
+
+body.dark-mode .bn11:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 #fff;
+}
+
+/* Make it adapt to dark mode */
+body.dark-mode .section-line {
+    border-top-color: var(--accent-pink);
+    opacity: 0.8;
+}
+
+/* Dark mode platform highlights */
+body.dark-mode a[href*="tutanota"]:hover { background-color: var(--accent-pink); color: #000; border-color: #EB0A1E; }
+body.dark-mode a[href*="discord"]:hover { background-color: #5865F2; color: #fff; border-color: #3c45c7; }
+body.dark-mode a[href*="bsky"]:hover { background-color: #0285FF; color: #fff; border-color: #005fcc; }
+body.dark-mode a[href*="ohai.social"]:hover { background-color: #6364FF; color: #fff; border-color: #4445cc; }
+body.dark-mode a[href*="boxd.it"]:hover { background-color: #00D474; color: #fff; border-color: #00995b; }
+body.dark-mode a[href*="steamcommunity"]:hover { background-color: #00ADEE; color: #fff; border-color: #018ec2; }
+body.dark-mode a[href*="github"]:hover { background-color: #333; color: #fff; border-color: #111; }
+
+/* ========================= */
+/* Small screen adjustments   */
+/* ========================= */
+@media (max-width: 600px) {
+    .bn11 {
+        display: block;
+        margin: 10px auto;
+    }
+}
