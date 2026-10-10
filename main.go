@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dhowden/tag"
@@ -144,6 +146,11 @@ func main() {
 		selectedMusicDir = path
 		log.Println("Selected directory:", selectedMusicDir)
 		go scanAndWatchDirectory(selectedMusicDir)
+	})
+
+	w.Bind("goCancelIndexing", func() {
+		log.Println("Indexing canceled by user")
+		cancelIndexing()
 	})
 
 	w.Bind("goSaveConfig", func(configJSON string) {
@@ -304,22 +311,56 @@ func parseTrackInfo(path string) TrackInfo {
 }
 
 var watcher *fsnotify.Watcher
+var currentScanCancel context.CancelFunc
+var scanMutex sync.Mutex
+
+func cancelIndexing() {
+	scanMutex.Lock()
+	defer scanMutex.Unlock()
+	if currentScanCancel != nil {
+		currentScanCancel()
+		currentScanCancel = nil
+	}
+	if watcher != nil {
+		watcher.Close()
+		watcher = nil
+	}
+}
 
 func scanAndWatchDirectory(root string) {
+	cancelIndexing()
+
+	scanMutex.Lock()
+	ctx, cancel := context.WithCancel(context.Background())
+	currentScanCancel = cancel
+	scanMutex.Unlock()
+
+	// Notify JS that indexing started
+	w.Dispatch(func() {
+		js := fmt.Sprintf("if (window.onIndexingStart) window.onIndexingStart(%q);", root)
+		w.Eval(js)
+	})
+
 	// Clear existing playlist in JS
 	w.Dispatch(func() {
 		w.Eval("window.liveClearPlaylist();")
 	})
 
-	if watcher != nil {
-		watcher.Close()
-	}
 	var err error
-	watcher, err = fsnotify.NewWatcher()
+	wWatcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Println("fsnotify error:", err)
 		return
 	}
+
+	scanMutex.Lock()
+	if ctx.Err() != nil {
+		wWatcher.Close()
+		scanMutex.Unlock()
+		return
+	}
+	watcher = wWatcher
+	scanMutex.Unlock()
 
 	// Walk dir to add all initial files and set up watches
 	var initialTracks []TrackInfo
@@ -327,8 +368,11 @@ func scanAndWatchDirectory(root string) {
 		if err != nil {
 			return err
 		}
+		if ctx.Err() != nil {
+			return filepath.SkipAll
+		}
 		if d.IsDir() {
-			watcher.Add(path)
+			wWatcher.Add(path)
 			return nil
 		}
 		if isAudioFile(path) {
@@ -336,9 +380,14 @@ func scanAndWatchDirectory(root string) {
 		}
 		return nil
 	})
-	if err != nil {
+	if err != nil && ctx.Err() == nil {
 		log.Println("WalkDir error:", err)
 	}
+
+	if ctx.Err() != nil {
+		return
+	}
+
 	if len(initialTracks) > 0 {
 		b, _ := json.Marshal(initialTracks)
 		js := fmt.Sprintf("window.liveAddTracks(%s);", string(b))
@@ -347,25 +396,31 @@ func scanAndWatchDirectory(root string) {
 		})
 	}
 
+	// Notify JS that indexing complete
+	w.Dispatch(func() {
+		w.Eval("if (window.onIndexingComplete) window.onIndexingComplete();")
+	})
+
 	// Watch loop
 	go func() {
 		for {
 			select {
-			case event, ok := <-watcher.Events:
+			case <-ctx.Done():
+				return
+			case event, ok := <-wWatcher.Events:
 				if !ok {
 					return
 				}
 				if event.Has(fsnotify.Create) {
 					info, err := os.Stat(event.Name)
 					if err == nil && info.IsDir() {
-						// Add new directory to watcher and scan it recursively
 						var newTracks []TrackInfo
-						err = filepath.WalkDir(event.Name, func(path string, d fs.DirEntry, err error) error {
-							if err != nil {
+						_ = filepath.WalkDir(event.Name, func(path string, d fs.DirEntry, err error) error {
+							if err != nil || ctx.Err() != nil {
 								return err
 							}
 							if d.IsDir() {
-								watcher.Add(path)
+								wWatcher.Add(path)
 								return nil
 							}
 							if isAudioFile(path) {
@@ -373,21 +428,18 @@ func scanAndWatchDirectory(root string) {
 							}
 							return nil
 						})
-						if err != nil {
-							log.Println("WalkDir on new dir error:", err)
-						}
-						if len(newTracks) > 0 {
+						if len(newTracks) > 0 && ctx.Err() == nil {
 							b, _ := json.Marshal(newTracks)
 							js := fmt.Sprintf("window.liveAddTracks(%s);", string(b))
 							w.Dispatch(func() {
 								w.Eval(js)
 							})
 						}
-					} else if isAudioFile(event.Name) {
+					} else if isAudioFile(event.Name) && ctx.Err() == nil {
 						pushTrackToJS(event.Name)
 					}
 				}
-			case err, ok := <-watcher.Errors:
+			case err, ok := <-wWatcher.Errors:
 				if !ok {
 					return
 				}

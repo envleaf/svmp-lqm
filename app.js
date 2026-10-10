@@ -16,6 +16,9 @@ document.addEventListener("DOMContentLoaded", function() {
     const dlAddBtn = document.getElementById('music-dl-add');
     const localInput = document.getElementById('local-file-input');
     const dirBrowserModal = document.getElementById('dir-browser-modal');
+    const indexingModal = document.getElementById('indexing-modal');
+    const indexingDirPath = document.getElementById('indexing-dir-path');
+    const indexingCancelBtn = document.getElementById('indexing-cancel-btn');
     const trackTitleDisplay = document.getElementById('track-title');
     const timeCurrent = document.getElementById('time-current');
     const timeTotal = document.getElementById('time-total');
@@ -695,6 +698,40 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         }
     }, 1000);
+
+    // --- Indexing Modal Callbacks ---
+    window.onIndexingStart = function(dirPath) {
+        if (indexingDirPath) {
+            indexingDirPath.innerText = dirPath || cm.state.nativeDir || '/';
+        }
+        if (indexingModal) {
+            indexingModal.style.display = 'flex';
+        }
+    };
+
+    window.onIndexingComplete = function() {
+        if (indexingModal) {
+            indexingModal.style.display = 'none';
+        }
+    };
+
+    if (indexingCancelBtn) {
+        indexingCancelBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (window.goCancelIndexing) {
+                window.goCancelIndexing();
+            }
+            window.liveClearPlaylist();
+            pauseAudio();
+            audioEl.removeAttribute('src');
+            if (indexingModal) {
+                indexingModal.style.display = 'none';
+            }
+            if (trackTitleDisplay) {
+                trackTitleDisplay.innerText = ui.t("No songs indexed. Please select a directory in [ opt +] to automatically index");
+            }
+        });
+    }
 
     // Go -> JS Push Notification
     window.liveAddTrack = function(trackInfo) {
@@ -2044,6 +2081,7 @@ document.addEventListener("DOMContentLoaded", function() {
             document.getElementById('keybind-modal').style.display = 'none';
             document.getElementById('welcome-modal').style.display = 'none';
             document.getElementById('song-info-modal').style.display = 'none';
+            if (indexingModal) indexingModal.style.display = 'none';
             devModal.style.display = 'none';
             cmdPalette.style.display = 'none';
             document.querySelectorAll('.menu-box').forEach(box => {
