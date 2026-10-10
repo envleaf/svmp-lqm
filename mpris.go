@@ -13,7 +13,7 @@ import (
 
 const (
 	mprisPath          = "/org/mpris/MediaPlayer2"
-	mprisNamePrefix    = "org.mpris.MediaPlayer2.svmp"
+	mprisNamePrefix    = "org.mpris.MediaPlayer2.svmp_lqm"
 	mprisRootInterface = "org.mpris.MediaPlayer2"
 	mprisPlayerInterface = "org.mpris.MediaPlayer2.Player"
 )
@@ -121,7 +121,7 @@ func initMpris() {
 			"CanQuit":      {false, false, prop.EmitTrue, nil},
 			"CanRaise":     {false, false, prop.EmitTrue, nil},
 			"HasTrackList": {false, false, prop.EmitTrue, nil},
-			"Identity":     {"SvMP", false, prop.EmitTrue, nil},
+			"Identity":     {"SVMP (LQM)", false, prop.EmitTrue, nil},
 			"SupportedUriSchemes": {[]string{"file"}, false, prop.EmitTrue, nil},
 			"SupportedMimeTypes":  {[]string{"audio/mpeg", "audio/flac", "audio/wav", "audio/ogg", "audio/mp4"}, false, prop.EmitTrue, nil},
 		},

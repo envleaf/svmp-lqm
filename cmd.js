@@ -141,7 +141,7 @@ window.CommandPalette = (function() {
                         } else if (notifName === 'devmodeoff') {
                             setOutput("Developer mode disabled.");
                         } else if (notifName === 'hello') {
-                            setOutput("welcome to svmp // backtick for commands // slash for help");
+                            setOutput("welcome to SVMP (LQM) // backtick for commands // slash for help");
                         } else {
                             setOutput(`Unknown predefined notification: ${notifName}`, true);
                         }

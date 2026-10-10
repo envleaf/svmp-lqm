@@ -50,7 +50,7 @@ func loadConfig() AppConfig {
 	data, err := os.ReadFile(configPath)
 	if err == nil {
 		if err := yaml.Unmarshal(data, &config); err != nil {
-			log.Println("Error parsing svmp.conf:", err)
+			log.Println("Error parsing svmp-lqm.conf:", err)
 		}
 	} else if os.IsNotExist(err) {
 		// Default config mimicking ConfigManager state
@@ -89,16 +89,16 @@ func saveConfig(config AppConfig) {
 		return
 	}
 	if err := os.WriteFile(configPath, data, 0644); err != nil {
-		log.Println("Error writing svmp.conf:", err)
+		log.Println("Error writing svmp-lqm.conf:", err)
 	}
 }
 
 func main() {
 	execPath, err := os.Executable()
 	if err == nil {
-		configPath = filepath.Join(filepath.Dir(execPath), "svmp.conf")
+		configPath = filepath.Join(filepath.Dir(execPath), "svmp-lqm.conf")
 	} else {
-		configPath = "svmp.conf"
+		configPath = "svmp-lqm.conf"
 	}
 
 	// Setup embedded file server on a random open port
@@ -116,7 +116,7 @@ func main() {
 	w = webview.New(debug)
 	defer w.Destroy()
 
-	w.SetTitle("SvMP")
+	w.SetTitle("SVMP (LQM)")
 	w.SetSize(900, 700, webview.HintNone)
 
 	homeDir, _ := os.UserHomeDir()
