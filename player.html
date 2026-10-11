@@ -200,6 +200,30 @@
             border: 1px solid var(--prompt-color); padding: 30px;
             z-index: 10000; box-shadow: 0 0 20px rgba(0,0,0,0.8);
             max-width: 90vw; max-height: 90vh; overflow-y: auto;
+            -webkit-font-smoothing: antialiased;
+            transform-style: preserve-3d;
+            backface-visibility: hidden;
+        }
+
+        .modal-close-x {
+            position: absolute;
+            top: 15px;
+            right: 18px;
+            color: var(--text-color);
+            text-decoration: none;
+            font-family: 'Source Code Pro', monospace;
+            font-size: 0.9em;
+            cursor: pointer;
+            z-index: 100002;
+            line-height: 1;
+        }
+        .modal-close-x:hover {
+            color: #ff5555;
+            text-decoration: none;
+        }
+        .menu-box:not(.overlay-modal) .modal-close-x {
+            top: 2px;
+            right: 8px;
         }
 
         /* --- Base Layout --- */
@@ -231,7 +255,7 @@
             pointer-events: none;
         }
 
-        .menu-box { display: none; font-size: 0.9em; color: var(--prompt-color); margin-top: 0.5em; line-height: 1.5; text-align: left; }
+        .menu-box { display: none; font-size: 0.9em; color: var(--prompt-color); margin-top: 0.5em; line-height: 1.5; text-align: left; position: relative; }
         .menu-box.scrollable { max-height: 250px; overflow-y: auto; overflow-x: hidden; }
         .menu-box::-webkit-scrollbar { width: 6px; }
         .menu-box::-webkit-scrollbar-thumb { background: var(--prompt-color); border-radius: 4px; }
@@ -374,6 +398,7 @@
 <div id="clock-display"></div>
 
 <div id="welcome-modal" class="overlay-modal">
+<a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0; color: var(--text-color);">
 +-- welcome to SVMP (LQM) --------------+
 |                                       |
@@ -395,6 +420,7 @@
 </div>
 
 <div id="keybind-modal" class="overlay-modal focus-hide">
+<a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0; color: var(--text-color);">
 +-- system keybinds --------------------+
 |                                       |
@@ -415,7 +441,7 @@
 |  [Esc]     close all menus/modals     |
 |  [/]       toggle this menu           |
 |                                       |
-|  svmp-lqm 0.0.47 (nightly-lqm)        |
+|  svmp-lqm 0.0.48 (nightly-lqm)        |
 +---------------------------------------+</pre>
 </div>
 
@@ -463,16 +489,19 @@
     </p>
 
 <div id="index-box" class="menu-box scrollable focus-hide">
+<a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0;">+-- global index -----------------------+</pre>
     <div id="index-results" style="margin-top: 0.5em; margin-bottom: 0; line-height: 1.8;"></div>
 </div>
 
 <div id="queue-box" class="menu-box scrollable focus-hide">
+<a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0;">+-- play queue -------------------------+</pre>
     <div id="queue-results" style="margin-top: 0.5em; margin-bottom: 0; line-height: 1.8;"></div>
 </div>
 
 <div id="playlist-box" class="menu-box scrollable focus-hide">
+<a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0;">
 +-- custom playlist builder ------------+
 | input tracks (e.g. 1,5,9,10-17)       |</pre>
@@ -485,16 +514,19 @@
 </div>
 
 <div id="search-box" class="menu-box scrollable focus-hide">
+<a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0;">+-- track search -----------------------+</pre>
     <input type="text" id="search-input" placeholder="search active queue..." spellcheck="false" autocomplete="off" style="margin-top:0.5em;">
     <div id="search-results" style="margin-top: 0.5em; margin-bottom: 0; line-height: 1.8;"></div>
 </div>
 
 <div id="lyrics-box" class="menu-box scrollable focus-hide">
+<a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0; white-space: pre-wrap;" id="lyrics-content">waiting for track...</pre>
 </div>
 
 <div id="eq-box" class="menu-box focus-hide">
+<a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0;">+-- audio equalizer --------------------+</pre>
 <pre style="margin: 0; font-size: 0.8em; color: #555;">(applies to local files only)</pre>
     <div class="fx-grid" style="margin-top: 1em;">
@@ -516,6 +548,7 @@
 </div>
 
 <div id="fx-box" class="menu-box scrollable focus-hide">
+<a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0;">+-- visual engine ----------------------+</pre>
     <div class="fx-grid" id="standard-fx">
         <div class="fx-col">
@@ -571,6 +604,7 @@
 </div>
 
 <div id="opt-box" class="menu-box focus-hide">
+<a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0;">+-- options ----------------------------+</pre>
     <div class="fx-grid" style="margin-top: 1em;">
         <div class="fx-col">
@@ -635,6 +669,7 @@
 
 <!-- Directory Browser Modal -->
 <div id="dir-browser-modal" class="overlay-modal" style="display: none; padding: 20px; z-index: 10001; text-align: left; background: var(--bg-color); border: 1px solid var(--text-color); box-shadow: 4px 4px 0 var(--text-color); min-width: 400px; max-height: 80vh; overflow: hidden; flex-direction: column;">
+<a href="#" class="modal-close-x">[ x ]</a>
 <strong style="margin: 0; color: var(--text-color); font-size: 1.2em;">directory browser</strong>
 <p style="margin: 0.5em 0; color: var(--text-color); word-break: break-all;"><strong>path:</strong> <span id="dir-browser-path">/</span></p>
 <div id="dir-browser-list" style="flex-grow: 1; overflow-y: auto; border: 1px dashed var(--prompt-color); padding: 10px; margin-bottom: 10px; color: var(--text-color); line-height: 1.8;">
@@ -648,6 +683,7 @@
 
 <!-- Song Info Modal -->
 <div id="song-info-modal" class="overlay-modal" style="display: none; padding: 20px; z-index: 10001; text-align: left; background: var(--bg-color); border: 1px solid var(--text-color); box-shadow: 4px 4px 0 var(--text-color);">
+<a href="#" class="modal-close-x">[ x ]</a>
 <strong style="margin: 0; margin-bottom: 15px; display: block; color: var(--text-color); font-size: 1.2em;">track information</strong>
 <div style="display: flex; margin-bottom: 20px;">
     <div id="song-info-artwork-container" style="width: 120px; height: 120px; border: 1px solid var(--text-color); margin-right: 15px; overflow: hidden; position: relative; flex-shrink: 0;">
@@ -672,6 +708,7 @@
 
 <!-- Indexing Modal -->
 <div id="indexing-modal" class="overlay-modal" style="display: none; padding: 20px; z-index: 10006; text-align: left; background: var(--bg-color); border: 1px solid var(--text-color); box-shadow: 4px 4px 0 var(--text-color); min-width: 300px; flex-direction: column;">
+    <a href="#" class="modal-close-x">[ x ]</a>
     <strong style="margin: 0; color: var(--text-color); font-size: 1.2em;">Please wait</strong>
     <p style="margin: 15px 0 5px 0; color: var(--text-color);">Indexing files from <span id="indexing-dir-path"></span></p>
     <p style="margin: 0 0 15px 0; color: var(--prompt-color); font-size: 0.9em;">This may take a few moments.</p>
@@ -682,6 +719,7 @@
 
 <!-- Prompt Modal -->
 <div id="prompt-modal" class="overlay-modal" style="display: none; padding: 20px; z-index: 10005; text-align: left; background: var(--bg-color); border: 1px solid var(--text-color); box-shadow: 4px 4px 0 var(--text-color); min-width: 300px; flex-direction: column;">
+    <a href="#" class="modal-close-x">[ x ]</a>
     <strong id="prompt-modal-title" style="margin: 0; color: var(--text-color); font-size: 1.2em;">prompt</strong>
     <input type="text" id="prompt-modal-input" style="margin-top: 15px; margin-bottom: 15px; width: 100%; box-sizing: border-box;">
     <div style="display: flex; gap: 15px; color: var(--text-color); justify-content: flex-end;">
@@ -692,7 +730,8 @@
 
 <!-- Lists Modal -->
 <div id="lists-modal" class="overlay-modal" style="display: none; padding: 20px; z-index: 10002; text-align: left; background: var(--bg-color); border: 1px solid var(--text-color); box-shadow: 4px 4px 0 var(--text-color); min-width: 400px; max-height: 80vh; overflow: hidden; flex-direction: column;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+    <a href="#" class="modal-close-x">[ x ]</a>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-right: 25px;">
         <strong id="lists-modal-title" style="margin: 0; color: var(--text-color); font-size: 1.2em;">playlists</strong>
         <div>
             <a href="#" id="lists-modal-create" style="margin-right: 10px;">[create]</a>

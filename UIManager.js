@@ -327,7 +327,11 @@ window.UIManager = (function() {
         // In sway/mobile mode, or if hidden by focus mode, we shouldn't force widths
         const isHidden = window.getComputedStyle(actionRow).display === 'none';
 
-        document.querySelectorAll('.menu-box:not(.overlay-modal)').forEach(box => {
+        document.querySelectorAll('.menu-box').forEach(box => {
+            if (box.classList.contains('overlay-modal')) {
+                box.style.width = '';
+                return;
+            }
             if (isHidden) {
                 box.style.width = '';
                 box.style.margin = '0.5em 0 0 0'; // Restore original margin

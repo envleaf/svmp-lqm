@@ -38,6 +38,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const cmdPalette = document.createElement('div');
     cmdPalette.id = 'cmd-palette';
     cmdPalette.innerHTML = `
+        <a href="#" class="modal-close-x">[ x ]</a>
         <input type="text" id="cmd-input" placeholder="> enter command..." autocomplete="off">
         <pre id="cmd-output"></pre>
     `;
@@ -54,6 +55,7 @@ document.addEventListener("DOMContentLoaded", function() {
     devModal.id = 'dev-modal';
     devModal.className = 'overlay-modal';
     devModal.innerHTML = `
+<a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0; color: var(--text-color);">
 +-- developer tools --------------------+
 |                                       |
@@ -1751,6 +1753,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 targetBox.classList.add('overlay-modal');
                 targetBox.style.display = 'block';
                 btn.innerText = ui.t(btn.innerText.replace('+', '-'));
+                ui.syncMenuBoxWidth();
             }
         });
     });
@@ -2051,6 +2054,55 @@ document.addEventListener("DOMContentLoaded", function() {
         input.click();
     });
 
+    // Global Close / Esc Helper
+    function closeAllModalsAndMenus() {
+        document.getElementById('keybind-modal').style.display = 'none';
+        document.getElementById('welcome-modal').style.display = 'none';
+        document.getElementById('song-info-modal').style.display = 'none';
+        document.getElementById('dir-browser-modal').style.display = 'none';
+        if (document.getElementById('dir-browser-modal')) document.getElementById('dir-browser-modal').classList.remove('overlay-modal');
+        if (indexingModal) indexingModal.style.display = 'none';
+        document.getElementById('prompt-modal').style.display = 'none';
+        document.getElementById('lists-modal').style.display = 'none';
+        devModal.style.display = 'none';
+        cmdPalette.style.display = 'none';
+        document.querySelectorAll('.menu-box').forEach(box => {
+            box.classList.remove('overlay-modal');
+            if (!cm.state.isSway && !cm.state.isMobile) {
+                box.style.display = 'none';
+            }
+        });
+        if (!cm.state.isSway && !cm.state.isMobile) {
+            document.querySelectorAll('.menu-toggle').forEach(btn => btn.innerText = ui.t(btn.innerText.replace('-', '+')));
+        }
+    }
+
+    // Attach click listeners to all top-right modal close icons [ x ]
+    document.addEventListener('click', e => {
+        if (e.target.classList.contains('modal-close-x')) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeAllModalsAndMenus();
+        }
+    });
+
+    // Right-click anywhere on page to close active modals/menus (if right-clicking outside interactive targets like menu-toggles, info-btns, notifications)
+    document.addEventListener('contextmenu', e => {
+        // If clicking on a menu-toggle button, info button, or notification item, let its own contextmenu handler deal with it
+        if (e.target.closest('.menu-toggle') || e.target.closest('.info-btn') || e.target.closest('.notification-item')) {
+            return;
+        }
+
+        // Check if any modal or menu box (overlay or open) is currently active/visible
+        const openModal = document.querySelector('.overlay-modal[style*="display: block"], .overlay-modal[style*="display: flex"], #cmd-palette[style*="display: block"]');
+        const openMenu = document.querySelector('.menu-box[style*="display: block"]');
+
+        if (openModal || openMenu) {
+            e.preventDefault();
+            closeAllModalsAndMenus();
+        }
+    });
+
     // Keybinds
     document.addEventListener('keydown', e => {
         if (e.code === 'Backquote' && e.target.tagName !== 'INPUT') {
@@ -2078,21 +2130,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         if (e.key === 'Escape') {
             e.preventDefault();
-            document.getElementById('keybind-modal').style.display = 'none';
-            document.getElementById('welcome-modal').style.display = 'none';
-            document.getElementById('song-info-modal').style.display = 'none';
-            if (indexingModal) indexingModal.style.display = 'none';
-            devModal.style.display = 'none';
-            cmdPalette.style.display = 'none';
-            document.querySelectorAll('.menu-box').forEach(box => {
-                box.classList.remove('overlay-modal');
-                if (!cm.state.isSway && !cm.state.isMobile) {
-                    box.style.display = 'none';
-                }
-            });
-            if (!cm.state.isSway && !cm.state.isMobile) {
-                document.querySelectorAll('.menu-toggle').forEach(btn => btn.innerText = ui.t(btn.innerText.replace('-', '+')));
-            }
+            closeAllModalsAndMenus();
             return;
         }
 
