@@ -848,6 +848,79 @@ document.addEventListener("DOMContentLoaded", function() {
         refreshDevMode: () => {
             if (!cm.state.devMode) devModal.style.display = 'none';
         },
+        toggleFetch: () => {
+            const fetchEl = document.getElementById('fetch-display');
+            if (fetchEl && (fetchEl.style.display === 'block' || fetchEl.style.display === 'flex')) {
+                fetchEl.style.display = 'none';
+                return;
+            }
+
+            const cmdPal = document.getElementById('cmd-palette');
+            if (cmdPal) cmdPal.style.display = 'none';
+
+            function escapeHtml(str) {
+                return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
+
+            if (window.goFetchSystemInfo) {
+                const res = window.goFetchSystemInfo();
+                const processResult = (rawOutput) => {
+                    if (!rawOutput || !rawOutput.trim()) {
+                        if (ui && ui.showNotification) {
+                            ui.showNotification("No fetch utility found (hyfetch, fastfetch, neofetch required)");
+                        }
+                        return;
+                    }
+
+                    const cleanText = rawOutput.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '');
+                    const lines = cleanText.split('\n');
+
+                    let osLineFound = false;
+                    let htmlLines = lines.map(line => {
+                        if (!osLineFound && /OS:/i.test(line)) {
+                            osLineFound = true;
+                            const replaced = escapeHtml(line).replace(/(OS:)/i, '$1 <a href="#" id="fetch-close-btn" style="color: var(--text-color); text-decoration: none; cursor: pointer;">[ x ]</a>');
+                            return `<div>${replaced}</div>`;
+                        }
+                        return `<div>${escapeHtml(line)}</div>`;
+                    });
+
+                    if (!osLineFound && htmlLines.length > 0) {
+                        htmlLines[0] = `<div><a href="#" id="fetch-close-btn" style="color: var(--text-color); text-decoration: none; cursor: pointer;">[ x ]</a> ${htmlLines[0]}</div>`;
+                    }
+
+                    let el = document.getElementById('fetch-display');
+                    if (!el) {
+                        el = document.createElement('div');
+                        el.id = 'fetch-display';
+                        const playerContainer = document.querySelector('.player-container');
+                        if (playerContainer) playerContainer.appendChild(el);
+                        else document.body.appendChild(el);
+                    }
+
+                    el.innerHTML = htmlLines.join('');
+                    el.style.display = 'block';
+
+                    const closeBtn = document.getElementById('fetch-close-btn');
+                    if (closeBtn) {
+                        closeBtn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            el.style.display = 'none';
+                        });
+                    }
+                };
+
+                if (res && typeof res.then === 'function') {
+                    res.then(processResult);
+                } else {
+                    processResult(res);
+                }
+            } else {
+                if (ui && ui.showNotification) {
+                    ui.showNotification("No fetch utility found (hyfetch, fastfetch, neofetch required)");
+                }
+            }
+        },
         uploadFiles: (toPlaylist) => {
             let tempInput = document.createElement('input');
             tempInput.type = 'file';
