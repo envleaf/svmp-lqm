@@ -3,7 +3,7 @@ window.CommandPalette = (function() {
 
     // Note: Ensure all future command messages passed to setOutput are "pretty messages"
     // as they will be broadcasted to the user via the floating notification system.
-    function setOutput(text, isError = false) {
+    function setOutput(text, isError = false, suppressNotif = false) {
         if (!outputEl) return;
         outputEl.style.color = isError ? 'var(--text-color)' : 'var(--prompt-color)';
         if (isError) {
@@ -13,7 +13,7 @@ window.CommandPalette = (function() {
         }
 
         // Also push to the notification system
-        if (window.UIManager && typeof window.UIManager.showNotification === 'function') {
+        if (!suppressNotif && window.UIManager && typeof window.UIManager.showNotification === 'function') {
             window.UIManager.showNotification(text);
         }
     }
@@ -66,11 +66,118 @@ window.CommandPalette = (function() {
                             case 'msg': setOutput("msg <send/-d/on/off/-t/track/clear/--position> : control notifications. use 'help msg' for details."); break;
                             case 'time': setOutput("time : displays the total time you have been listening to music during this session."); break;
                             case 'fetch': setOutput("fetch : displays system info in-line on screen."); break;
+                            case 'kill': setOutput("kill : forcibly terminates the application."); break;
+                            case 'query': setOutput("query : displays advanced host system and audio playback information."); break;
                             default: setOutput(`Unknown help topic: ${topic}`, true); break;
                         }
                     } else {
-                        setOutput("Commands: net, play, pause, stop, config, del, upload, dev, msg, time, fetch, help.\nType 'help <command>' for details.");
+                        setOutput("Commands: net, play, pause, stop, config, del, upload, dev, msg, time, fetch, query, kill, help.\nType 'help <command>' for details.");
                     }
+                    break;
+
+                case 'kill':
+                    if (window.goKillApp) {
+                        window.goKillApp();
+                    } else {
+                        window.close();
+                    }
+                    break;
+
+                case 'query':
+                    (function() {
+                        const activeTrack = pm.getActiveTrack();
+                        const trackPath = activeTrack ? (activeTrack.originalPath || '') : '';
+
+                        function formatBytes(bytes) {
+                            if (!bytes || bytes <= 0) return 'Unknown';
+                            const sizes = ['B', 'KB', 'MB', 'GB'];
+                            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+                            return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + sizes[i];
+                        }
+
+                        function formatSeconds(secs) {
+                            if (isNaN(secs) || secs < 0) return '0:00';
+                            const m = Math.floor(secs / 60);
+                            const s = Math.floor(secs % 60);
+                            return `${m}:${s < 10 ? '0' : ''}${s}`;
+                        }
+
+                        function buildQueryOutput(dataStr) {
+                            let sysData = {};
+                            try {
+                                sysData = typeof dataStr === 'string' ? JSON.parse(dataStr) : (dataStr || {});
+                            } catch (e) {
+                                sysData = {};
+                            }
+
+                            const audio = ae.audio || document.getElementById('audio-local');
+                            let audioLines = [];
+
+                            if (activeTrack && audio) {
+                                let trackName = activeTrack.title || activeTrack.originalName || 'Unknown Track';
+                                if (activeTrack.artist) {
+                                    trackName = `${activeTrack.artist} - ${trackName}`;
+                                }
+                                audioLines.push(`| Track: ${trackName}`);
+
+                                if (sysData.format || sysData.fileType) {
+                                    let fmt = [sysData.format, sysData.fileType].filter(Boolean).join(' / ');
+                                    audioLines.push(`| Format: ${fmt}`);
+                                }
+
+                                if (sysData.fileSize) {
+                                    audioLines.push(`| File Size: ${formatBytes(sysData.fileSize)}`);
+                                    if (audio.duration && audio.duration > 0) {
+                                        const kbps = Math.round((sysData.fileSize * 8) / audio.duration / 1000);
+                                        audioLines.push(`| Bitrate: ~${kbps} kbps`);
+                                    }
+                                }
+
+                                const sampleRate = (ae.audioCtx && ae.audioCtx.sampleRate) ? `${ae.audioCtx.sampleRate} Hz` : '44100 Hz (default)';
+                                audioLines.push(`| Sample Rate: ${sampleRate}`);
+                                audioLines.push(`| Channels: 2 (Stereo)`);
+
+                                const playState = audio.paused ? 'Paused' : 'Playing';
+                                const posStr = `${formatSeconds(audio.currentTime)} / ${formatSeconds(audio.duration)}`;
+                                audioLines.push(`| Playback: ${playState} [${posStr}]`);
+
+                                const volPct = Math.round(audio.volume * 100);
+                                audioLines.push(`| Volume: ${volPct}% (Muted: ${audio.muted})`);
+                            } else {
+                                audioLines.push(`| Status: No audio track active`);
+                            }
+
+                            const outputBox = [
+                                `+-- system & audio query ---------------+`,
+                                `| OS: ${sysData.os || 'unknown'} (${sysData.arch || 'unknown'}) | CPUs: ${sysData.numCpu || 'N/A'}`,
+                                `| Host: ${sysData.hostname || 'localhost'}`,
+                                `| Go Runtime: ${sysData.goVersion || 'N/A'}`,
+                                `|                                       `,
+                                `| -- audio playback --------------------`,
+                                ...audioLines,
+                                `+---------------------------------------+`
+                            ].join('\n');
+
+                            setOutput(outputBox, false, true);
+                        }
+
+                        if (window.goGetQueryInfo) {
+                            const res = window.goGetQueryInfo(trackPath);
+                            if (res && typeof res.then === 'function') {
+                                res.then(buildQueryOutput);
+                            } else {
+                                buildQueryOutput(res);
+                            }
+                        } else {
+                            buildQueryOutput({
+                                os: 'browser',
+                                arch: 'js',
+                                numCpu: navigator.hardwareConcurrency || 1,
+                                goVersion: 'N/A',
+                                hostname: window.location.hostname || 'localhost'
+                            });
+                        }
+                    })();
                     break;
 
                 case 'fetch':
