@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -183,6 +184,15 @@ func main() {
 		updateMprisSeeked(posMicroseconds)
 	})
 
+	w.Bind("goFetchSystemInfo", func() string {
+		out, err := executeFetch()
+		if err != nil {
+			log.Println("Fetch error:", err)
+			return ""
+		}
+		return out
+	})
+
 	initMpris()
 
 	// Inject the initial config into the window object
@@ -280,6 +290,29 @@ func listDirectory(path string) {
 	w.Dispatch(func() {
 		w.Eval(js)
 	})
+}
+
+func executeFetch() (string, error) {
+	utilities := []string{"hyfetch", "fastfetch", "neofetch"}
+	var foundPath string
+	for _, util := range utilities {
+		path, err := exec.LookPath(util)
+		if err == nil {
+			foundPath = path
+			break
+		}
+	}
+
+	if foundPath == "" {
+		return "", fmt.Errorf("no fetch utility found")
+	}
+
+	cmd := exec.Command(foundPath)
+	out, err := cmd.CombinedOutput()
+	if err != nil && len(out) == 0 {
+		return "", err
+	}
+	return string(out), nil
 }
 
 func isAudioFile(name string) bool {

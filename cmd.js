@@ -65,10 +65,19 @@ window.CommandPalette = (function() {
                             case 'dev': setOutput("dev <on/off> : toggles developer mode."); break;
                             case 'msg': setOutput("msg <send/-d/on/off/-t/track/clear/--position> : control notifications. use 'help msg' for details."); break;
                             case 'time': setOutput("time : displays the total time you have been listening to music during this session."); break;
+                            case 'fetch': setOutput("fetch : displays system info in-line on screen."); break;
                             default: setOutput(`Unknown help topic: ${topic}`, true); break;
                         }
                     } else {
-                        setOutput("Commands: net, play, pause, stop, config, del, upload, dev, msg, time, help.\nType 'help <command>' for details.");
+                        setOutput("Commands: net, play, pause, stop, config, del, upload, dev, msg, time, fetch, help.\nType 'help <command>' for details.");
+                    }
+                    break;
+
+                case 'fetch':
+                    if (pc && pc.toggleFetch) {
+                        pc.toggleFetch();
+                    } else {
+                        setOutput("Fetch command not available.", true);
                     }
                     break;
 
