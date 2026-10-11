@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -191,6 +192,15 @@ func main() {
 			return ""
 		}
 		return out
+	})
+
+	w.Bind("goKillApp", func() {
+		log.Println("Forcibly terminating application via kill command...")
+		os.Exit(0)
+	})
+
+	w.Bind("goGetQueryInfo", func(audioPath string) string {
+		return getQueryInfo(audioPath)
 	})
 
 	initMpris()
@@ -480,6 +490,59 @@ func scanAndWatchDirectory(root string) {
 			}
 		}
 	}()
+}
+
+type QueryInfo struct {
+	OS        string `json:"os"`
+	Arch      string `json:"arch"`
+	NumCPU    int    `json:"numCpu"`
+	GoVersion string `json:"goVersion"`
+	Hostname  string `json:"hostname"`
+
+	HasTrack bool   `json:"hasTrack"`
+	Format   string `json:"format,omitempty"`
+	FileType string `json:"fileType,omitempty"`
+	Title    string `json:"title,omitempty"`
+	Artist   string `json:"artist,omitempty"`
+	Album    string `json:"album,omitempty"`
+	FileSize int64  `json:"fileSize,omitempty"`
+}
+
+func getQueryInfo(audioPath string) string {
+	hostname, _ := os.Hostname()
+
+	info := QueryInfo{
+		OS:        runtime.GOOS,
+		Arch:      runtime.GOARCH,
+		NumCPU:    runtime.NumCPU(),
+		GoVersion: runtime.Version(),
+		Hostname:  hostname,
+	}
+
+	if audioPath != "" {
+		cleanPath := filepath.Clean(audioPath)
+		fileInfo, err := os.Stat(cleanPath)
+		if err == nil && !fileInfo.IsDir() {
+			info.HasTrack = true
+			info.FileSize = fileInfo.Size()
+
+			f, err := os.Open(cleanPath)
+			if err == nil {
+				defer f.Close()
+				m, err := tag.ReadFrom(f)
+				if err == nil {
+					info.Format = string(m.Format())
+					info.FileType = string(m.FileType())
+					info.Title = m.Title()
+					info.Artist = m.Artist()
+					info.Album = m.Album()
+				}
+			}
+		}
+	}
+
+	data, _ := json.Marshal(info)
+	return string(data)
 }
 
 func pushTrackToJS(path string) {
