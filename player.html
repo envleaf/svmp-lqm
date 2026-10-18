@@ -485,7 +485,7 @@
 |  [Esc]     close all menus/modals     |
 |  [/]       toggle this menu           |
 |                                       |
-|  svmp-lqm 0.0.50 (nightly-lqm)        |
+|  svmp-lqm 0.0.51 (nightly-lqm)        |
 +---------------------------------------+</pre>
 </div>
 
@@ -758,6 +758,18 @@
     <p style="margin: 0 0 15px 0; color: var(--prompt-color); font-size: 0.9em;">This may take a few moments.</p>
     <div style="display: flex; gap: 15px; color: var(--text-color);">
         <a href="#" id="indexing-cancel-btn">[cancel]</a>
+    </div>
+</div>
+
+<!-- Error / Warning Dialogue Modal -->
+<div id="error-dialogue-modal" class="overlay-modal" style="display: none; padding: 20px; z-index: 10007; text-align: left; background: var(--bg-color); border: 1px solid var(--text-color); box-shadow: 4px 4px 0 var(--text-color); min-width: 350px; max-width: 500px; flex-direction: column;">
+    <a href="#" class="modal-close-x">[ x ]</a>
+    <strong id="error-dialogue-title" style="margin: 0; color: #ff5555; font-size: 1.2em;">notice</strong>
+    <p id="error-dialogue-message" style="margin: 15px 0 10px 0; color: var(--text-color); word-break: break-word; line-height: 1.5;"></p>
+    <p id="error-dialogue-suggestion" style="margin: 0 0 15px 0; color: var(--prompt-color); font-size: 0.9em; line-height: 1.4;"></p>
+    <div style="display: flex; gap: 15px; color: var(--text-color); justify-content: flex-end; align-items: center;">
+        <a href="#" id="error-dialogue-browse" style="display: none; margin-right: auto;">[browse folder]</a>
+        <a href="#" id="error-dialogue-ok">[ok]</a>
     </div>
 </div>
 

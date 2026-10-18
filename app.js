@@ -717,6 +717,50 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     };
 
+    // Error Dialogue Helper
+    window.showErrorDialogue = function(title, message, suggestion, allowBrowse = false) {
+        const modal = document.getElementById('error-dialogue-modal');
+        const titleEl = document.getElementById('error-dialogue-title');
+        const msgEl = document.getElementById('error-dialogue-message');
+        const sugEl = document.getElementById('error-dialogue-suggestion');
+        const browseBtn = document.getElementById('error-dialogue-browse');
+        const okBtn = document.getElementById('error-dialogue-ok');
+
+        if (!modal) return;
+
+        titleEl.innerText = ui.t(title || "Notice");
+        msgEl.innerText = ui.t(message || "");
+        sugEl.innerText = ui.t(suggestion || "");
+
+        if (allowBrowse && dlAddBtn) {
+            browseBtn.style.display = 'inline-block';
+        } else {
+            browseBtn.style.display = 'none';
+        }
+
+        modal.style.display = 'flex';
+
+        function cleanup() {
+            modal.style.display = 'none';
+            okBtn.removeEventListener('click', onOk);
+            browseBtn.removeEventListener('click', onBrowse);
+        }
+
+        function onOk(e) {
+            if (e) e.preventDefault();
+            cleanup();
+        }
+
+        function onBrowse(e) {
+            if (e) e.preventDefault();
+            cleanup();
+            if (dlAddBtn) dlAddBtn.click();
+        }
+
+        okBtn.addEventListener('click', onOk);
+        browseBtn.addEventListener('click', onBrowse);
+    };
+
     if (indexingCancelBtn) {
         indexingCancelBtn.addEventListener('click', function(e) {
             e.preventDefault();

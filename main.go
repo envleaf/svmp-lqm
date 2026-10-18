@@ -213,6 +213,22 @@ func main() {
 	w.Run()
 }
 
+func isSubpath(parent, child string) bool {
+	if parent == "" || child == "" {
+		return false
+	}
+	p := filepath.Clean(parent)
+	c := filepath.Clean(child)
+	rel, err := filepath.Rel(p, c)
+	if err != nil {
+		return false
+	}
+	if rel == "." || (!strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != "..") {
+		return true
+	}
+	return false
+}
+
 func startServer(listener net.Listener) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Serve static files from current directory
@@ -228,7 +244,7 @@ func startServer(listener net.Listener) {
 		}
 		// Security: Only allow serving files from the selected music directory
 		cleanPath := filepath.Clean(path)
-		if selectedMusicDir == "" || !strings.HasPrefix(filepath.ToSlash(cleanPath), filepath.ToSlash(selectedMusicDir)) {
+		if selectedMusicDir == "" || !isSubpath(selectedMusicDir, cleanPath) {
 			http.Error(w, "Access Denied", http.StatusForbidden)
 			return
 		}
@@ -243,7 +259,7 @@ func startServer(listener net.Listener) {
 		}
 
 		cleanPath := filepath.Clean(path)
-		if selectedMusicDir == "" || !strings.HasPrefix(filepath.ToSlash(cleanPath), filepath.ToSlash(selectedMusicDir)) {
+		if selectedMusicDir == "" || !isSubpath(selectedMusicDir, cleanPath) {
 			http.Error(w, "Access Denied", http.StatusForbidden)
 			return
 		}
@@ -281,6 +297,13 @@ func listDirectory(path string) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		log.Println("Error reading dir:", err)
+		w.Dispatch(func() {
+			title := "Directory Read Error"
+			msg := fmt.Sprintf("Unable to read directory %q: %v", path, err)
+			sug := "Please check folder permissions or navigate to another directory."
+			js := fmt.Sprintf("if (window.showErrorDialogue) window.showErrorDialogue(%q, %q, %q, false);", title, msg, sug)
+			w.Eval(js)
+		})
 		return
 	}
 
@@ -373,6 +396,19 @@ func cancelIndexing() {
 func scanAndWatchDirectory(root string) {
 	cancelIndexing()
 
+	// Ensure root directory exists before proceeding (e.g. ~/Music on new machines)
+	if err := os.MkdirAll(root, 0755); err != nil {
+		log.Println("Error creating music directory:", err)
+		w.Dispatch(func() {
+			title := "Directory Access Error"
+			msg := fmt.Sprintf("Unable to access or create target directory: %q", root)
+			sug := "Please select an existing directory with read/write permissions via [opt +]."
+			js := fmt.Sprintf("if (window.showErrorDialogue) window.showErrorDialogue(%q, %q, %q, true);", title, msg, sug)
+			w.Eval(js)
+		})
+		return
+	}
+
 	scanMutex.Lock()
 	ctx, cancel := context.WithCancel(context.Background())
 	currentScanCancel = cancel
@@ -389,33 +425,43 @@ func scanAndWatchDirectory(root string) {
 		w.Eval("window.liveClearPlaylist();")
 	})
 
-	var err error
+	var wWatcher *fsnotify.Watcher
 	wWatcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Println("fsnotify error:", err)
-		return
+		log.Println("fsnotify init error:", err)
+		// Non-fatal for scanning: live file watching won't be available, but we can still index files
+	} else {
+		scanMutex.Lock()
+		if ctx.Err() != nil {
+			wWatcher.Close()
+			scanMutex.Unlock()
+			return
+		}
+		watcher = wWatcher
+		scanMutex.Unlock()
 	}
 
-	scanMutex.Lock()
-	if ctx.Err() != nil {
-		wWatcher.Close()
-		scanMutex.Unlock()
-		return
-	}
-	watcher = wWatcher
-	scanMutex.Unlock()
+	var initialTracks []TrackInfo
+	var walkErrors []string
+	var watchFailedDirs int
 
 	// Walk dir to add all initial files and set up watches
-	var initialTracks []TrackInfo
 	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
 		if ctx.Err() != nil {
 			return filepath.SkipAll
 		}
+		if err != nil {
+			log.Println("WalkDir skip path error:", path, err)
+			walkErrors = append(walkErrors, fmt.Sprintf("%s: %v", path, err))
+			return nil // Skip problem path without halting entire scan
+		}
 		if d.IsDir() {
-			wWatcher.Add(path)
+			if wWatcher != nil {
+				if wErr := wWatcher.Add(path); wErr != nil {
+					watchFailedDirs++
+					log.Println("fsnotify watch add error:", path, wErr)
+				}
+			}
 			return nil
 		}
 		if isAudioFile(path) {
@@ -423,11 +469,11 @@ func scanAndWatchDirectory(root string) {
 		}
 		return nil
 	})
-	if err != nil && ctx.Err() == nil {
-		log.Println("WalkDir error:", err)
-	}
 
 	if ctx.Err() != nil {
+		if wWatcher != nil {
+			wWatcher.Close()
+		}
 		return
 	}
 
@@ -444,52 +490,77 @@ func scanAndWatchDirectory(root string) {
 		w.Eval("if (window.onIndexingComplete) window.onIndexingComplete();")
 	})
 
-	// Watch loop
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case event, ok := <-wWatcher.Events:
-				if !ok {
-					return
-				}
-				if event.Has(fsnotify.Create) {
-					info, err := os.Stat(event.Name)
-					if err == nil && info.IsDir() {
-						var newTracks []TrackInfo
-						_ = filepath.WalkDir(event.Name, func(path string, d fs.DirEntry, err error) error {
-							if err != nil || ctx.Err() != nil {
-								return err
-							}
-							if d.IsDir() {
-								wWatcher.Add(path)
-								return nil
-							}
-							if isAudioFile(path) {
-								newTracks = append(newTracks, parseTrackInfo(path))
-							}
-							return nil
-						})
-						if len(newTracks) > 0 && ctx.Err() == nil {
-							b, _ := json.Marshal(newTracks)
-							js := fmt.Sprintf("window.liveAddTracks(%s);", string(b))
-							w.Dispatch(func() {
-								w.Eval(js)
-							})
-						}
-					} else if isAudioFile(event.Name) && ctx.Err() == nil {
-						pushTrackToJS(event.Name)
-					}
-				}
-			case err, ok := <-wWatcher.Errors:
-				if !ok {
-					return
-				}
-				log.Println("watcher error:", err)
+	// If there were non-fatal errors during indexing/watching, show dialogue to user
+	if len(walkErrors) > 0 || watchFailedDirs > 0 || wWatcher == nil {
+		w.Dispatch(func() {
+			title := "Indexing Warnings"
+			var msg string
+			var sug string
+
+			if wWatcher == nil {
+				msg = "File system watcher could not be initialized."
+				sug = "Files were indexed, but live updates for newly added files in the background will be disabled."
+			} else if watchFailedDirs > 0 {
+				msg = fmt.Sprintf("Indexed files successfully, but failed to watch %d folder(s) for live updates (possible system inotify watch limit reached).", watchFailedDirs)
+				sug = "To enable live file updates for large libraries on Linux, consider increasing fs.inotify.max_user_watches in sysctl."
+			} else {
+				msg = fmt.Sprintf("Encountered permission/access issues while reading %d items.", len(walkErrors))
+				sug = "Ensure all subfolders have read permissions."
 			}
-		}
-	}()
+
+			js := fmt.Sprintf("if (window.showErrorDialogue) window.showErrorDialogue(%q, %q, %q, false);", title, msg, sug)
+			w.Eval(js)
+		})
+	}
+
+	// Watch loop if fsnotify was successfully created
+	if wWatcher != nil {
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case event, ok := <-wWatcher.Events:
+					if !ok {
+						return
+					}
+					if event.Has(fsnotify.Create) {
+						info, err := os.Stat(event.Name)
+						if err == nil && info.IsDir() {
+							var newTracks []TrackInfo
+							_ = filepath.WalkDir(event.Name, func(path string, d fs.DirEntry, err error) error {
+								if err != nil || ctx.Err() != nil {
+									return nil
+								}
+								if d.IsDir() {
+									_ = wWatcher.Add(path)
+									return nil
+								}
+								if isAudioFile(path) {
+									newTracks = append(newTracks, parseTrackInfo(path))
+								}
+								return nil
+							})
+							if len(newTracks) > 0 && ctx.Err() == nil {
+								b, _ := json.Marshal(newTracks)
+								js := fmt.Sprintf("window.liveAddTracks(%s);", string(b))
+								w.Dispatch(func() {
+									w.Eval(js)
+								})
+							}
+						} else if isAudioFile(event.Name) && ctx.Err() == nil {
+							pushTrackToJS(event.Name)
+						}
+					}
+				case err, ok := <-wWatcher.Errors:
+					if !ok {
+						return
+					}
+					log.Println("watcher error:", err)
+				}
+			}
+		}()
+	}
 }
 
 type QueryInfo struct {
