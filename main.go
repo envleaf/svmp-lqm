@@ -341,11 +341,17 @@ func parseTrackInfo(path string) TrackInfo {
 		OriginalPath: path,
 	}
 
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Recovered panic while parsing metadata for %s: %v", path, r)
+		}
+	}()
+
 	f, err := os.Open(path)
 	if err == nil {
 		defer f.Close()
 		m, err := tag.ReadFrom(f)
-		if err == nil {
+		if err == nil && m != nil {
 			info.Title = m.Title()
 			info.Artist = m.Artist()
 		}
@@ -405,21 +411,42 @@ func scanAndWatchDirectory(root string) {
 	watcher = wWatcher
 	scanMutex.Unlock()
 
+	// Stream tracks in batches to JS to prevent memory spikes and UI freezing
+	const batchSize = 50
+	var trackBatch []TrackInfo
+
+	flushBatch := func() {
+		if len(trackBatch) == 0 {
+			return
+		}
+		b, err := json.Marshal(trackBatch)
+		if err == nil {
+			js := fmt.Sprintf("window.liveAddTracks(%s);", string(b))
+			w.Dispatch(func() {
+				w.Eval(js)
+			})
+		}
+		trackBatch = nil
+	}
+
 	// Walk dir to add all initial files and set up watches
-	var initialTracks []TrackInfo
 	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return err
+			log.Println("WalkDir item error:", path, err)
+			return nil // Continue walking other items
 		}
 		if ctx.Err() != nil {
 			return filepath.SkipAll
 		}
 		if d.IsDir() {
-			wWatcher.Add(path)
+			_ = wWatcher.Add(path)
 			return nil
 		}
 		if isAudioFile(path) {
-			initialTracks = append(initialTracks, parseTrackInfo(path))
+			trackBatch = append(trackBatch, parseTrackInfo(path))
+			if len(trackBatch) >= batchSize {
+				flushBatch()
+			}
 		}
 		return nil
 	})
@@ -431,13 +458,8 @@ func scanAndWatchDirectory(root string) {
 		return
 	}
 
-	if len(initialTracks) > 0 {
-		b, _ := json.Marshal(initialTracks)
-		js := fmt.Sprintf("window.liveAddTracks(%s);", string(b))
-		w.Dispatch(func() {
-			w.Eval(js)
-		})
-	}
+	// Flush remaining tracks
+	flushBatch()
 
 	// Notify JS that indexing complete
 	w.Dispatch(func() {

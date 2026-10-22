@@ -1070,31 +1070,39 @@ document.addEventListener("DOMContentLoaded", function() {
     function playAudio() {
         if (!pm.getActiveTrack()) return;
         ae.initAudioAPI(cm.state.eq);
-        let p = ae.play();
-        if (p !== undefined) {
-            p.then(() => {
-                consecutiveErrorCount = 0;
-                toggleBtn.innerText = ui.t('[pause]');
-                updateVisualizerDisplay();
-                startMarquee();
-                if (window.goUpdateMprisStatus) window.goUpdateMprisStatus("Playing");
-            }).catch(error => {
-                console.error("Audio playback failed:", error);
-                trackTitleDisplay.innerText = ui.t("Error loading audio file");
+        try {
+            let p = ae.play();
+            if (p !== undefined && p !== null) {
+                p.then(() => {
+                    consecutiveErrorCount = 0;
+                    toggleBtn.innerText = ui.t('[pause]');
+                    updateVisualizerDisplay();
+                    startMarquee();
+                    if (window.goUpdateMprisStatus) window.goUpdateMprisStatus("Playing");
+                }).catch(error => {
+                    console.error("Audio playback failed:", error);
+                    trackTitleDisplay.innerText = ui.t("Error loading audio file or missing audio sink");
+                    toggleBtn.innerText = ui.t('[play]');
 
-                let isSkipped = cm.state.options && cm.state.options.disableErrorSkip;
-                if (!isSkipped) {
-                    consecutiveErrorCount++;
-                    if (consecutiveErrorCount > 5) {
-                        ui.showNotification("Five playback errors occurred consecutively! Stopping playback.");
-                        pauseAudio();
-                        audioEl.removeAttribute('src');
+                    let isSkipped = cm.state.options && cm.state.options.disableErrorSkip;
+                    if (!isSkipped) {
+                        consecutiveErrorCount++;
+                        if (consecutiveErrorCount > 3) {
+                            ui.showNotification("Playback errors occurred consecutively. Stopping playback.");
+                            pauseAudio();
+                            audioEl.removeAttribute('src');
+                        } else {
+                            ui.showNotification("Playback encountered an error, skipping.");
+                            nextTrack();
+                        }
                     } else {
-                        ui.showNotification("Playback encountered an error, skipping.");
-                        nextTrack();
+                        pauseAudio();
                     }
-                }
-            });
+                });
+            }
+        } catch (err) {
+            console.error("Audio play exception:", err);
+            toggleBtn.innerText = ui.t('[play]');
         }
     }
 
@@ -1864,6 +1872,25 @@ document.addEventListener("DOMContentLoaded", function() {
     });
     audioEl.addEventListener('ended', () => {
         nextTrack();
+    });
+    audioEl.addEventListener('error', (e) => {
+        const err = audioEl.error;
+        let errMsg = "Unknown audio error";
+        if (err) {
+            switch (err.code) {
+                case err.MEDIA_ERR_ABORTED: errMsg = "Audio playback aborted"; break;
+                case err.MEDIA_ERR_NETWORK: errMsg = "Audio network error"; break;
+                case err.MEDIA_ERR_DECODE: errMsg = "Audio decode error"; break;
+                case err.MEDIA_ERR_SRC_NOT_SUPPORTED: errMsg = "Audio format or sink unavailable"; break;
+            }
+        }
+        console.error("Audio element error:", errMsg, err);
+        trackTitleDisplay.innerText = ui.t(errMsg);
+        toggleBtn.innerText = ui.t('[play]');
+        if (ui && ui.showNotification) {
+            ui.showNotification(`Playback error: ${errMsg}`);
+        }
+        pauseAudio();
     });
 
     // UI Toggles
