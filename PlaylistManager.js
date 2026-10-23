@@ -1,12 +1,68 @@
 window.PlaylistManager = (function() {
-    let playlist = []; // Array of { file: File, src: string, title: string, artist: string }
+    let playlist = []; // Array of { file: File, src: string, title: string, artist: string, originalPath: string }
     let activeIndices = [];
-    let currentIndex = 0;
+    let currentGlobalIdx = -1;
     let isCustomMode = false;
+    let isShuffle = false;
 
-    let queue = [];
-    let history = [];
+    let manualQueue = []; // Array of globalIdx manually queued by user
+    let upcomingQueue = []; // Array of globalIdx automatically queued next
+    let history = []; // Array of globalIdx previously played
     const MAX_HISTORY = 50;
+
+    function shuffleArray(array) {
+        let arr = [...array];
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+
+    function rebuildUpcomingQueue(shuffleState) {
+        if (shuffleState !== undefined) {
+            isShuffle = shuffleState;
+        }
+
+        if (activeIndices.length === 0) {
+            upcomingQueue = [];
+            return;
+        }
+
+        // Candidates are activeIndices excluding current playing track and manual queue tracks
+        let candidates = activeIndices.filter(gIdx => gIdx !== currentGlobalIdx && !manualQueue.includes(gIdx));
+
+        if (isShuffle) {
+            upcomingQueue = shuffleArray(candidates);
+        } else {
+            let currentPos = activeIndices.indexOf(currentGlobalIdx);
+            if (currentPos !== -1) {
+                let sequential = [];
+                for (let i = currentPos + 1; i < activeIndices.length; i++) {
+                    let gIdx = activeIndices[i];
+                    if (!manualQueue.includes(gIdx)) sequential.push(gIdx);
+                }
+                for (let i = 0; i < currentPos; i++) {
+                    let gIdx = activeIndices[i];
+                    if (!manualQueue.includes(gIdx)) sequential.push(gIdx);
+                }
+                upcomingQueue = sequential;
+            } else {
+                upcomingQueue = candidates;
+            }
+        }
+    }
+
+    function resetQueueAndPosition() {
+        if (activeIndices.length > 0) {
+            currentGlobalIdx = activeIndices[0];
+        } else {
+            currentGlobalIdx = -1;
+        }
+        manualQueue = [];
+        history = [];
+        rebuildUpcomingQueue();
+    }
 
     function addNativeTrack(trackData, callback) {
         let wasEmpty = playlist.length === 0;
@@ -34,6 +90,11 @@ window.PlaylistManager = (function() {
         if (!window._suppressPlaylistReset) {
             isCustomMode = false;
             activeIndices = Array.from({length: playlist.length}, (_, i) => i);
+            if (wasEmpty) {
+                resetQueueAndPosition();
+            } else {
+                rebuildUpcomingQueue();
+            }
         }
 
         if (callback) callback(wasEmpty, [addedIndex]);
@@ -85,19 +146,14 @@ window.PlaylistManager = (function() {
                     newlyAddedIndices.push(i);
                 }
 
-                // If we are currently preserving custom mode (like in upload -p), we should NOT reset it here.
-                // However, the standard behavior is to reset it.
-                // We'll let the callback optionally handle the activeIndices if it wants to,
-                // but by default we must reset it unless told otherwise.
-                // Since `addFiles` doesn't know about `toPlaylist`, we'll pass it a flag or let the callback run *before* resetting?
-                // Actually, instead of modifying `addFiles` signature extensively, we can provide a method to suppress the reset,
-                // or just let `uploadFiles` cache the state before calling `addFiles` and restore it.
-                // Let's modify `addFiles` to accept an options object optionally, or just handle it here:
-
-                // We will do this: simply don't reset `activeIndices` if `window._suppressPlaylistReset` is true.
                 if (!window._suppressPlaylistReset) {
                     isCustomMode = false;
                     activeIndices = Array.from({length: playlist.length}, (_, i) => i);
+                    if (wasEmpty) {
+                        resetQueueAndPosition();
+                    } else {
+                        rebuildUpcomingQueue();
+                    }
                 }
 
                 if (callback) callback(wasEmpty, newlyAddedIndices);
@@ -134,48 +190,109 @@ window.PlaylistManager = (function() {
 
         activeIndices = finalArr;
         isCustomMode = true;
-        currentIndex = 0;
+        resetQueueAndPosition();
         return true;
     }
 
     function clearCustomPlaylist() {
         activeIndices = Array.from({length: playlist.length}, (_, i) => i);
         isCustomMode = false;
-        currentIndex = 0;
+        resetQueueAndPosition();
     }
 
-    function toggleQueue(localIdx) {
-        let qIdx = queue.indexOf(localIdx);
+    function toggleQueue(globalIdx) {
+        let qIdx = manualQueue.indexOf(globalIdx);
         if (qIdx > -1) {
-            queue.splice(qIdx, 1);
+            manualQueue.splice(qIdx, 1);
         } else {
-            queue.push(localIdx);
+            manualQueue.push(globalIdx);
+            // Remove from upcomingQueue if present
+            upcomingQueue = upcomingQueue.filter(gIdx => gIdx !== globalIdx);
         }
     }
 
     function popQueue() {
-        if (queue.length > 0) {
-            return queue.shift();
+        if (manualQueue.length > 0) {
+            return manualQueue.shift();
         }
         return null;
     }
 
-    function pushHistory(localIdx) {
-        if (history.length > 0 && history[history.length - 1] === localIdx) return;
-        history.push(localIdx);
+    function pushHistory(globalIdx) {
+        if (globalIdx === undefined || globalIdx === null || globalIdx === -1) return;
+        if (history.length > 0 && history[history.length - 1] === globalIdx) return;
+        history.push(globalIdx);
         if (history.length > MAX_HISTORY) {
             history.shift();
         }
     }
 
     function popHistory() {
-        if (history.length > 1) {
-            history.pop(); // Remove current track
-            return history.pop(); // Return previous track
-        } else if (history.length === 1) {
-             return history.pop(); // Return the only track if that's what we want
+        if (history.length > 0) {
+            return history.pop();
         }
         return null;
+    }
+
+    function nextTrack() {
+        if (activeIndices.length === 0) return null;
+
+        if (currentGlobalIdx !== -1) {
+            pushHistory(currentGlobalIdx);
+        }
+
+        if (manualQueue.length > 0) {
+            currentGlobalIdx = manualQueue.shift();
+        } else if (upcomingQueue.length > 0) {
+            currentGlobalIdx = upcomingQueue.shift();
+        } else {
+            // Refill upcomingQueue if empty
+            rebuildUpcomingQueue();
+            if (upcomingQueue.length > 0) {
+                currentGlobalIdx = upcomingQueue.shift();
+            } else {
+                currentGlobalIdx = activeIndices[0];
+            }
+        }
+
+        return currentGlobalIdx;
+    }
+
+    function prevTrack() {
+        if (activeIndices.length === 0) return null;
+
+        let prevGlobalIdx = popHistory();
+        if (prevGlobalIdx !== null && prevGlobalIdx !== undefined) {
+            if (currentGlobalIdx !== -1) {
+                // Prepend current track to upcoming queue so skipping forward plays it again
+                upcomingQueue.unshift(currentGlobalIdx);
+            }
+            currentGlobalIdx = prevGlobalIdx;
+        } else {
+            // If no history, jump to previous item in activeIndices
+            let currentPos = activeIndices.indexOf(currentGlobalIdx);
+            let prevPos = (currentPos - 1 + activeIndices.length) % activeIndices.length;
+            if (currentGlobalIdx !== -1) {
+                upcomingQueue.unshift(currentGlobalIdx);
+            }
+            currentGlobalIdx = activeIndices[prevPos];
+        }
+
+        return currentGlobalIdx;
+    }
+
+    function playTrackByGlobalIndex(targetGlobalIdx) {
+        if (currentGlobalIdx !== -1 && currentGlobalIdx !== targetGlobalIdx) {
+            pushHistory(currentGlobalIdx);
+        }
+
+        currentGlobalIdx = targetGlobalIdx;
+
+        // Remove from manualQueue if present
+        manualQueue = manualQueue.filter(gIdx => gIdx !== targetGlobalIdx);
+
+        // Rebuild upcoming queue for remaining tracks
+        rebuildUpcomingQueue();
     }
 
     function removeTrack(globalIdx) {
@@ -183,56 +300,39 @@ window.PlaylistManager = (function() {
 
         playlist.splice(globalIdx, 1);
 
+        const adjustIndex = (idx) => {
+            if (idx === globalIdx) return -1;
+            if (idx > globalIdx) return idx - 1;
+            return idx;
+        };
+
         // Update activeIndices
-        let newActiveIndices = [];
-        let currentIndexGlobal = activeIndices[currentIndex];
-        let newCurrentIndexGlobal = -1;
+        activeIndices = activeIndices
+            .map(adjustIndex)
+            .filter(idx => idx !== -1);
 
-        for (let i = 0; i < activeIndices.length; i++) {
-            let gIdx = activeIndices[i];
-            if (gIdx < globalIdx) {
-                newActiveIndices.push(gIdx);
-                if (gIdx === currentIndexGlobal) newCurrentIndexGlobal = gIdx;
-            } else if (gIdx > globalIdx) {
-                newActiveIndices.push(gIdx - 1);
-                if (gIdx === currentIndexGlobal) newCurrentIndexGlobal = gIdx - 1;
-            }
+        // Update currentGlobalIdx
+        if (currentGlobalIdx === globalIdx) {
+            currentGlobalIdx = activeIndices.length > 0 ? activeIndices[0] : -1;
+        } else if (currentGlobalIdx > globalIdx) {
+            currentGlobalIdx--;
         }
 
-        activeIndices = newActiveIndices;
+        // Update manualQueue, upcomingQueue, history
+        manualQueue = manualQueue.map(adjustIndex).filter(idx => idx !== -1);
+        upcomingQueue = upcomingQueue.map(adjustIndex).filter(idx => idx !== -1);
+        history = history.map(adjustIndex).filter(idx => idx !== -1);
 
-        // Fix currentIndex
-        if (activeIndices.length === 0) {
-            currentIndex = 0;
-        } else {
-            if (newCurrentIndexGlobal !== -1) {
-                let newCurrIdx = activeIndices.indexOf(newCurrentIndexGlobal);
-                if (newCurrIdx !== -1) currentIndex = newCurrIdx;
-                else currentIndex = Math.min(currentIndex, activeIndices.length - 1);
-            } else {
-                currentIndex = Math.min(currentIndex, activeIndices.length - 1);
-            }
-        }
-
-        // Update queue
-        let newQueue = [];
-        for (let i = 0; i < queue.length; i++) {
-            let qIdx = queue[i];
-            if (qIdx < globalIdx) newQueue.push(qIdx);
-            else if (qIdx > globalIdx) newQueue.push(qIdx - 1);
-        }
-        queue = newQueue;
-
-        // Update history
-        let newHistory = [];
-        for (let i = 0; i < history.length; i++) {
-            let hIdx = history[i];
-            if (hIdx < globalIdx) newHistory.push(hIdx);
-            else if (hIdx > globalIdx) newHistory.push(hIdx - 1);
-        }
-        history = newHistory;
+        rebuildUpcomingQueue();
 
         return true;
+    }
+
+    function getQueueList() {
+        if (currentGlobalIdx === -1) {
+            return [...manualQueue, ...upcomingQueue];
+        }
+        return [currentGlobalIdx, ...manualQueue, ...upcomingQueue];
     }
 
     return {
@@ -243,25 +343,56 @@ window.PlaylistManager = (function() {
         popQueue,
         pushHistory,
         popHistory,
+        nextTrack,
+        prevTrack,
+        playTrackByGlobalIndex,
+        rebuildUpcomingQueue,
+        resetQueueAndPosition,
+        getQueueList,
         buildCustomPlaylist,
         clearCustomPlaylist,
 
         get playlist() { return playlist; },
         get activeIndices() { return activeIndices; },
 
-        get currentIndex() { return currentIndex; },
-        set currentIndex(val) { currentIndex = val; },
+        get currentGlobalIdx() { return currentGlobalIdx; },
+        set currentGlobalIdx(val) {
+            currentGlobalIdx = val;
+            rebuildUpcomingQueue();
+        },
+
+        get currentIndex() {
+            let idx = activeIndices.indexOf(currentGlobalIdx);
+            return idx !== -1 ? idx : 0;
+        },
+        set currentIndex(val) {
+            if (val >= 0 && val < activeIndices.length) {
+                currentGlobalIdx = activeIndices[val];
+                rebuildUpcomingQueue();
+            }
+        },
 
         get isCustomMode() { return isCustomMode; },
         set isCustomMode(val) { isCustomMode = val; },
-        set activeIndices(arr) { activeIndices = arr; },
+        set activeIndices(arr) {
+            activeIndices = arr;
+            rebuildUpcomingQueue();
+        },
 
-        get queue() { return queue; },
+        get isShuffle() { return isShuffle; },
+        set isShuffle(val) {
+            isShuffle = val;
+            rebuildUpcomingQueue(isShuffle);
+        },
+
+        get queue() { return manualQueue; },
+        get manualQueue() { return manualQueue; },
+        get upcomingQueue() { return upcomingQueue; },
         get history() { return history; },
 
         getActiveTrack() {
-            if (activeIndices.length === 0 || currentIndex >= activeIndices.length) return null;
-            return playlist[activeIndices[currentIndex]];
+            if (currentGlobalIdx === -1 || currentGlobalIdx >= playlist.length) return null;
+            return playlist[currentGlobalIdx];
         },
 
         exportPlaylist() {
