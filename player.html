@@ -239,8 +239,9 @@
 
         #ascii-progress-container {
             display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px;
-            font-size: 0.8em; color: var(--prompt-color); margin-bottom: 0.5em; user-select: none; width: 100%;
+            font-size: 0.8em; color: var(--prompt-color); margin-bottom: 0.2em; user-select: none; width: 100%;
         }
+        #playlist-status-text:empty { display: none; }
         #ascii-bar, #vol-bar { cursor: pointer; color: var(--text-color); letter-spacing: 1px; }
 
         #live-visualizer {
@@ -485,7 +486,7 @@
 |  [Esc]     close all menus/modals     |
 |  [/]       toggle this menu           |
 |                                       |
-|  svmp-lqm 0.0.52 (nightly-lqm)        |
+|  svmp-lqm 0.0.53 (nightly-lqm)        |
 +---------------------------------------+</pre>
 </div>
 
@@ -518,10 +519,10 @@
             <span id="vol-bar">[|||||.....]</span>
         </div>
 
-        <p style="font-size: 0.7em; color: var(--prompt-color); margin-top: 0.5em;" id="playlist-status-text" class="focus-hide"></p>
+        <p style="font-size: 0.7em; color: var(--prompt-color); margin-top: 0.2em; margin-bottom: 0.2em;" id="playlist-status-text" class="focus-hide"></p>
     </div>
 
-    <p style="margin-top: 1.5em; margin-bottom: 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center;" id="action-row" class="focus-hide">
+    <p style="margin-top: 0.3em; margin-bottom: 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center;" id="action-row" class="focus-hide">
         <a href="#" id="music-index" class="menu-toggle" data-target="index-box">[index +]</a>
         <a href="#" id="music-queue" class="menu-toggle" data-target="queue-box">[queue +]</a>
         <a href="#" id="music-playlist" class="menu-toggle" data-target="playlist-box" style="display: none;">[playlist +]</a>
