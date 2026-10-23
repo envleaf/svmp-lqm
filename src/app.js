@@ -577,14 +577,20 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // --- Search ---
+    let matchingSearchResults = [];
+
     function executeSearch() {
+        let searchQueueAllBtn = document.getElementById('search-queue-all');
         let query = searchInput.value.toLowerCase().trim();
         if (!query) {
             searchResults.innerHTML = '';
+            matchingSearchResults = [];
+            if (searchQueueAllBtn) searchQueueAllBtn.style.display = 'none';
             return;
         }
         let html = '';
         let count = 0;
+        matchingSearchResults = [];
 
         const playlist = pm.playlist;
         const activeIndices = pm.activeIndices;
@@ -592,6 +598,7 @@ document.addEventListener("DOMContentLoaded", function() {
         activeIndices.forEach((globalIdx, localIdx) => {
             let track = playlist[globalIdx];
             if (track.title.toLowerCase().includes(query)) {
+                matchingSearchResults.push(globalIdx);
                 let num = String(localIdx + 1).padStart(2, '0');
                 let titleLower = track.title.toLowerCase();
                 let matchStart = titleLower.indexOf(query);
@@ -609,6 +616,9 @@ document.addEventListener("DOMContentLoaded", function() {
         });
         if (count === 0) {
             html = `<span style="color: var(--prompt-color);">${ui.t("no matches found.")}</span>`;
+            if (searchQueueAllBtn) searchQueueAllBtn.style.display = 'none';
+        } else {
+            if (searchQueueAllBtn) searchQueueAllBtn.style.display = 'inline-block';
         }
         searchResults.innerHTML = html;
 
@@ -617,6 +627,31 @@ document.addEventListener("DOMContentLoaded", function() {
             link.addEventListener('auxclick', e => handleTrackLinkClick(e, link));
         });
         bindInfoButtons(searchResults);
+    }
+
+    const searchQueueAllBtn = document.getElementById('search-queue-all');
+    if (searchQueueAllBtn) {
+        searchQueueAllBtn.addEventListener('click', e => {
+            e.preventDefault();
+            if (matchingSearchResults.length === 0) return;
+            pm.prependToQueue(matchingSearchResults, pm.isShuffle);
+            renderGlobalIndex();
+            renderCustomPlaylistIndex();
+            renderQueueIndex();
+            executeSearch();
+            if (audioEl.paused) {
+                if (pm.getActiveTrack()) {
+                    loadTrack();
+                    playAudio();
+                } else {
+                    let nextGIdx = pm.nextTrack();
+                    if (nextGIdx !== null && nextGIdx !== undefined) {
+                        loadTrack();
+                        playAudio();
+                    }
+                }
+            }
+        });
     }
 
     // --- Lyrics Syncing ---
@@ -1564,8 +1599,17 @@ document.addEventListener("DOMContentLoaded", function() {
 
         document.getElementById('song-info-title').innerText = track.title || "Unknown";
         document.getElementById('song-info-artist').innerText = track.artist || "Unknown";
-        document.getElementById('song-info-album').innerText = "Unknown";
+        document.getElementById('song-info-album').innerText = track.album || "Unknown";
         document.getElementById('song-info-bitrate').innerText = "Unknown";
+
+        const playAlbumBtn = document.getElementById('song-info-play-album');
+        const playArtistBtn = document.getElementById('song-info-play-artist');
+
+        let hasAlbum = track.album && track.album.trim() !== '' && track.album.toLowerCase() !== 'unknown';
+        let hasArtist = track.artist && track.artist.trim() !== '' && track.artist.toLowerCase() !== 'unknown';
+
+        if (playAlbumBtn) playAlbumBtn.style.display = hasAlbum ? 'inline-block' : 'none';
+        if (playArtistBtn) playArtistBtn.style.display = hasArtist ? 'inline-block' : 'none';
 
         infoArt.style.display = 'none';
         infoArtPlaceholder.style.display = 'flex';
@@ -1573,7 +1617,11 @@ document.addEventListener("DOMContentLoaded", function() {
         if (track.file && window.jsmediatags) {
              window.jsmediatags.read(track.file, {
                  onSuccess: function(tag) {
-                     if (tag.tags.album) document.getElementById('song-info-album').innerText = tag.tags.album;
+                     if (tag.tags.album) {
+                         document.getElementById('song-info-album').innerText = tag.tags.album;
+                         track.album = tag.tags.album;
+                         if (playAlbumBtn) playAlbumBtn.style.display = 'inline-block';
+                     }
 
                      if (tag.tags.picture) {
                          const { data, format } = tag.tags.picture;
@@ -1626,6 +1674,78 @@ document.addEventListener("DOMContentLoaded", function() {
         renderQueueIndex();
         if (searchInput.value) executeSearch();
         infoModal.style.display = 'none';
+    });
+
+    document.getElementById('song-info-play-album').addEventListener('click', e => {
+        e.preventDefault();
+        if (currentInfoIdx !== -1) {
+            let track = pm.playlist[currentInfoIdx];
+            if (track && track.album && track.album.toLowerCase() !== 'unknown') {
+                let targetAlbum = track.album.toLowerCase().trim();
+                let matchingIndices = [];
+                pm.playlist.forEach((t, gIdx) => {
+                    if (t.album && t.album.toLowerCase().trim() === targetAlbum) {
+                        matchingIndices.push(gIdx);
+                    }
+                });
+                if (matchingIndices.length > 0) {
+                    pm.prependToQueue(matchingIndices, pm.isShuffle);
+                    renderGlobalIndex();
+                    renderCustomPlaylistIndex();
+                    renderQueueIndex();
+                    if (searchInput.value) executeSearch();
+                    if (audioEl.paused) {
+                        if (pm.getActiveTrack()) {
+                            loadTrack();
+                            playAudio();
+                        } else {
+                            let nextGIdx = pm.nextTrack();
+                            if (nextGIdx !== null && nextGIdx !== undefined) {
+                                loadTrack();
+                                playAudio();
+                            }
+                        }
+                    }
+                }
+            }
+            infoModal.style.display = 'none';
+        }
+    });
+
+    document.getElementById('song-info-play-artist').addEventListener('click', e => {
+        e.preventDefault();
+        if (currentInfoIdx !== -1) {
+            let track = pm.playlist[currentInfoIdx];
+            if (track && track.artist && track.artist.toLowerCase() !== 'unknown') {
+                let targetArtist = track.artist.toLowerCase().trim();
+                let matchingIndices = [];
+                pm.playlist.forEach((t, gIdx) => {
+                    if (t.artist && t.artist.toLowerCase().trim() === targetArtist) {
+                        matchingIndices.push(gIdx);
+                    }
+                });
+                if (matchingIndices.length > 0) {
+                    pm.prependToQueue(matchingIndices, pm.isShuffle);
+                    renderGlobalIndex();
+                    renderCustomPlaylistIndex();
+                    renderQueueIndex();
+                    if (searchInput.value) executeSearch();
+                    if (audioEl.paused) {
+                        if (pm.getActiveTrack()) {
+                            loadTrack();
+                            playAudio();
+                        } else {
+                            let nextGIdx = pm.nextTrack();
+                            if (nextGIdx !== null && nextGIdx !== undefined) {
+                                loadTrack();
+                                playAudio();
+                            }
+                        }
+                    }
+                }
+            }
+            infoModal.style.display = 'none';
+        }
     });
 
     document.getElementById('song-info-add-list').addEventListener('click', e => {
@@ -1966,7 +2086,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         let lines = [
             `+-- STATS FOR NERDS --------------------+`,
-            `| Version: svmp-lqm 0.0.58 (nightly-lqm)`,
+            `| Version: svmp-lqm 0.0.59 (nightly-lqm)`,
             `| FPS: ${currentFps}`,
             `| Audio State: ${stateStr}`,
             `| Audio Position: ${posStr}`,
