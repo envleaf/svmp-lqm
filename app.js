@@ -1049,7 +1049,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
         // Update fav button UI
         if (favBtn) {
-            let isFav = cm.state.playlists && cm.state.playlists["Favorites"] && cm.state.playlists["Favorites"].includes(track.originalPath);
+            let isFav = false;
+            if (window.goIsFavorite && track.originalPath) {
+                isFav = window.goIsFavorite(track.originalPath);
+            }
             favBtn.innerText = isFav ? ui.t('[fav (x)]') : ui.t('[fav ( )]');
         }
 
@@ -1217,29 +1220,34 @@ document.addEventListener("DOMContentLoaded", function() {
 
     listsModalCreate.addEventListener('click', e => {
         e.preventDefault();
-        promptUser("enter playlist name:", (name) => {
+        promptUser("enter playlist name (letters/numbers only):", (name) => {
             if (!name) return;
-            if (!cm.state.playlists) cm.state.playlists = { "Favorites": [] };
-            if (cm.state.playlists[name]) {
-                ui.showNotification("playlist already exists");
+            let cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (!cleanName) {
+                ui.showNotification("invalid playlist name (a-z, 0-9 only)");
                 return;
             }
-            cm.state.playlists[name] = [];
-            cm.savePlaylists();
+
             if (currentListsView === 'add') {
-                cm.state.playlists[name].push(trackToAdd.originalPath);
-                cm.savePlaylists();
-                ui.showNotification(`added to ${name}`);
+                if (window.goAddTrackToPlaylist && trackToAdd) {
+                    let success = window.goAddTrackToPlaylist(cleanName, trackToAdd.originalPath);
+                    if (success) {
+                        ui.showNotification(`added to ${cleanName}`);
+                    } else {
+                        ui.showNotification(`failed to add to ${cleanName}`);
+                    }
+                }
                 listsModal.style.display = 'none';
             } else {
+                if (window.goCreatePlaylist) {
+                    window.goCreatePlaylist(cleanName);
+                }
                 openListsModal('main');
             }
         });
     });
 
     function openListsModal(view, data = null) {
-        if (!cm.state.playlists) cm.state.playlists = { "Favorites": [] };
-
         // Hide all active menus so modal is clearly visible
         document.querySelectorAll('.menu-box').forEach(el => {
             el.classList.remove('active');
@@ -1264,17 +1272,14 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function renderPlaylistsList() {
         let html = '';
-        const pls = cm.state.playlists;
+        let playlists = window.goListPlaylists ? window.goListPlaylists() : [];
 
-        // Ensure Favorites is always first
-        let keys = Object.keys(pls).filter(k => k !== "Favorites").sort((a,b) => a.localeCompare(b));
-        keys.unshift("Favorites");
-
-        keys.forEach(key => {
-            let count = pls[key].length;
+        playlists.forEach(pl => {
+            let key = pl.name;
+            let count = pl.trackCount;
             let displayCount = `[${count} tracks]`;
             html += `<div style="display: flex; align-items: center; margin-bottom: 5px;">`;
-            if (key !== "Favorites" && currentListsView !== 'add') {
+            if (key !== "favorites" && currentListsView !== 'add') {
                 html += `<a href="#" class="del-list-btn" data-name="${key}" style="color: #ff5555; text-decoration: none; margin-right: 10px;">[x]</a>`;
             } else if (currentListsView !== 'add') {
                 html += `<span style="display: inline-block; width: 30px;"></span>`;
@@ -1282,7 +1287,7 @@ document.addEventListener("DOMContentLoaded", function() {
             html += `<a href="#" class="list-link" data-name="${key}" style="display: block; text-decoration: none; flex-grow: 1;">${ui.t(key)} <span style="color: var(--prompt-color); font-size: 0.9em;">${ui.t(displayCount)}</span></a></div>`;
         });
 
-        if (keys.length === 0) {
+        if (playlists.length === 0) {
             html = `<span style="color: var(--prompt-color);">${ui.t("no playlists.")}</span>`;
         }
 
@@ -1293,8 +1298,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 e.preventDefault();
                 let name = btn.getAttribute('data-name');
                 if(confirm(`delete playlist '${name}'?`)) {
-                    delete cm.state.playlists[name];
-                    cm.savePlaylists();
+                    if (window.goDeletePlaylist) window.goDeletePlaylist(name);
                     renderPlaylistsList();
                 }
             });
@@ -1305,12 +1309,13 @@ document.addEventListener("DOMContentLoaded", function() {
                 e.preventDefault();
                 let name = link.getAttribute('data-name');
                 if (currentListsView === 'add') {
-                    if (!cm.state.playlists[name].includes(trackToAdd.originalPath)) {
-                        cm.state.playlists[name].push(trackToAdd.originalPath);
-                        cm.savePlaylists();
-                        ui.showNotification(`added to ${name}`);
-                    } else {
-                        ui.showNotification(`already in ${name}`);
+                    if (window.goAddTrackToPlaylist && trackToAdd) {
+                        let success = window.goAddTrackToPlaylist(name, trackToAdd.originalPath);
+                        if (success) {
+                            ui.showNotification(`added to ${name}`);
+                        } else {
+                            ui.showNotification(`already in or failed to add to ${name}`);
+                        }
                     }
                     listsModal.style.display = 'none';
                 } else {
@@ -1322,25 +1327,19 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function renderPlaylistTracks() {
         let html = '';
-        let listTracks = cm.state.playlists[currentViewingPlaylist] || [];
+        let listTracks = window.goGetPlaylistTracks ? window.goGetPlaylistTracks(currentViewingPlaylist) : [];
 
-        if (listTracks.length === 0) {
-            listsModalContent.innerHTML = `<span style="color: var(--prompt-color);">${ui.t("playlist is empty.")}</span>`;
+        if (!listTracks || listTracks.length === 0) {
+            listsModalContent.innerHTML = `<span style="color: var(--prompt-color);">${ui.t("playlist is empty or tracks missing.")}</span>`;
             return;
         }
 
-        listTracks.forEach((path, i) => {
-            // Try to find track in current global playlist
-            let globalTrack = pm.playlist.find(t => t.originalPath === path);
-            let displayTitle = path.split('/').pop().replace(/\.[^/.]+$/, "");
-            if (globalTrack) {
-                displayTitle = globalTrack.title;
-            }
-
+        listTracks.forEach((track, i) => {
+            let displayTitle = track.title || track.originalName;
             let num = String(i + 1).padStart(2, '0');
             let line = `| ${num}. ${displayTitle}`;
 
-            html += `<div style="display: flex;"><a href="#" class="del-track-btn" data-idx="${i}" style="color: #ff5555; text-decoration: none; margin-right: 5px;">[x]</a><a href="#" class="pl-track-link" data-idx="${i}" style="display: block; text-decoration: none; flex-grow: 1;">${ui.t(line)}</a></div>`;
+            html += `<div style="display: flex;"><a href="#" class="del-track-btn" data-path="${encodeURIComponent(track.originalPath)}" style="color: #ff5555; text-decoration: none; margin-right: 5px;">[x]</a><a href="#" class="pl-track-link" data-idx="${i}" style="display: block; text-decoration: none; flex-grow: 1;">${ui.t(line)}</a></div>`;
         });
 
         listsModalContent.innerHTML = html;
@@ -1348,16 +1347,16 @@ document.addEventListener("DOMContentLoaded", function() {
         document.querySelectorAll('.del-track-btn').forEach(btn => {
             btn.addEventListener('click', e => {
                 e.preventDefault();
-                let idx = parseInt(btn.getAttribute('data-idx'), 10);
-                cm.state.playlists[currentViewingPlaylist].splice(idx, 1);
-                cm.savePlaylists();
+                let originalPath = decodeURIComponent(btn.getAttribute('data-path'));
+                if (window.goRemoveTrackFromPlaylist) {
+                    window.goRemoveTrackFromPlaylist(currentViewingPlaylist, originalPath);
+                }
                 renderPlaylistTracks();
 
-                // If it's favorites and we're currently playing it, update the fav button
-                if (currentViewingPlaylist === "Favorites") {
+                if (currentViewingPlaylist === "favorites") {
                     let playingTrack = pm.getActiveTrack();
                     if (playingTrack && favBtn) {
-                        let isFav = cm.state.playlists["Favorites"].includes(playingTrack.originalPath);
+                        let isFav = window.goIsFavorite ? window.goIsFavorite(playingTrack.originalPath) : false;
                         favBtn.innerText = isFav ? ui.t('[fav (x)]') : ui.t('[fav ( )]');
                     }
                 }
@@ -1368,29 +1367,20 @@ document.addEventListener("DOMContentLoaded", function() {
             link.addEventListener('click', e => {
                 e.preventDefault();
                 let idx = parseInt(link.getAttribute('data-idx'), 10);
-                playPlaylistTrack(idx);
+                playPlaylistTrack(idx, listTracks);
             });
         });
     }
 
-    function playPlaylistTrack(targetLocalIdx) {
-        let listTracks = cm.state.playlists[currentViewingPlaylist] || [];
-        if (listTracks.length === 0) return;
+    function playPlaylistTrack(targetLocalIdx, listTracks) {
+        if (!listTracks || listTracks.length === 0) return;
 
         let newActiveIndices = [];
 
-        // Ensure all tracks in the playlist exist in the global index, if not, inject a dummy
-        listTracks.forEach(path => {
-            let globalIdx = pm.playlist.findIndex(t => t.originalPath === path);
+        listTracks.forEach(track => {
+            let globalIdx = pm.playlist.findIndex(t => t.originalPath === track.originalPath);
             if (globalIdx === -1) {
-                let dummyTitle = path.split('/').pop().replace(/\.[^/.]+$/, "");
-                pm.playlist.push({
-                    file: null,
-                    src: 'http://127.0.0.1:' + window.localServerPort + '/local?path=' + encodeURIComponent(path),
-                    title: dummyTitle + ' (offline?)',
-                    artist: '',
-                    originalPath: path
-                });
+                pm.playlist.push(track);
                 globalIdx = pm.playlist.length - 1;
             }
             newActiveIndices.push(globalIdx);
@@ -1714,20 +1704,14 @@ document.addEventListener("DOMContentLoaded", function() {
         let track = pm.getActiveTrack();
         if (!track || !track.originalPath) return;
 
-        if (!cm.state.playlists) cm.state.playlists = { "Favorites": [] };
-        if (!cm.state.playlists["Favorites"]) cm.state.playlists["Favorites"] = [];
-
-        let favs = cm.state.playlists["Favorites"];
-        let idx = favs.indexOf(track.originalPath);
-
-        if (idx > -1) {
-            favs.splice(idx, 1);
+        let isFav = window.goIsFavorite ? window.goIsFavorite(track.originalPath) : false;
+        if (isFav) {
+            if (window.goRemoveTrackFromPlaylist) window.goRemoveTrackFromPlaylist("favorites", track.originalPath);
             favBtn.innerText = ui.t('[fav ( )]');
         } else {
-            favs.push(track.originalPath);
+            if (window.goAddTrackToPlaylist) window.goAddTrackToPlaylist("favorites", track.originalPath);
             favBtn.innerText = ui.t('[fav (x)]');
         }
-        cm.savePlaylists();
     });
 
     infoBtn.addEventListener('click', e => {
@@ -1962,7 +1946,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         let lines = [
             `+-- STATS FOR NERDS --------------------+`,
-            `| Version: svmp-lqm 0.0.56 (nightly-lqm)`,
+            `| Version: svmp-lqm 0.0.57 (nightly-lqm)`,
             `| FPS: ${currentFps}`,
             `| Audio State: ${stateStr}`,
             `| Audio Position: ${posStr}`,
