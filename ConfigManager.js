@@ -9,7 +9,7 @@ window.ConfigManager = (function() {
         visualizer: true,
         charOverride: null,
         isUwu: false,
-        options: { notifications: true, trackNotif: true, hintsNotif: true, notifDuration: 5000, marqueeSpeed: 'normal', notifPosition: 'tl', expie: false, timebar: true },
+        options: { notifications: true, trackNotif: true, hintsNotif: true, notifDuration: 5000, marqueeSpeed: 'normal', notifPosition: 'tl', expie: false, timebar: true, fullscreen: false },
         nativeDir: "",
         playlists: { "Favorites": [] },
         firstRun: true
