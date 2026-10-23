@@ -4,6 +4,7 @@ window.PlaylistManager = (function() {
     let currentGlobalIdx = -1;
     let isCustomMode = false;
     let isShuffle = false;
+    let activePlaylistName = null;
 
     let manualQueue = []; // Array of globalIdx manually queued by user
     let upcomingQueue = []; // Array of globalIdx automatically queued next
@@ -165,6 +166,7 @@ window.PlaylistManager = (function() {
         }
     }
 
+    // DEPRECATED: buildCustomPlaylist is legacy custom range builder logic
     function buildCustomPlaylist(inputStr) {
         if (playlist.length === 0) return false;
         let res = new Set();
@@ -201,7 +203,15 @@ window.PlaylistManager = (function() {
     function clearCustomPlaylist() {
         activeIndices = Array.from({length: playlist.length}, (_, i) => i);
         isCustomMode = false;
+        activePlaylistName = null;
         resetQueueAndPosition();
+    }
+
+    function exitPlaylistQueue() {
+        activeIndices = Array.from({length: playlist.length}, (_, i) => i);
+        isCustomMode = false;
+        activePlaylistName = null;
+        rebuildUpcomingQueue();
     }
 
     function toggleQueue(globalIdx) {
@@ -397,6 +407,9 @@ window.PlaylistManager = (function() {
 
         get isCustomMode() { return isCustomMode; },
         set isCustomMode(val) { isCustomMode = val; },
+        get activePlaylistName() { return activePlaylistName; },
+        set activePlaylistName(val) { activePlaylistName = val; },
+        exitPlaylistQueue,
         set activeIndices(arr) {
             activeIndices = arr;
             rebuildUpcomingQueue();

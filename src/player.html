@@ -487,7 +487,7 @@
 |  [Esc]     close all menus/modals     |
 |  [/]       toggle this menu           |
 |                                       |
-|  svmp-lqm 0.0.59 (nightly-lqm)        |
+|  svmp-lqm 0.0.60 (nightly-lqm)        |
 +---------------------------------------+</pre>
 </div>
 
@@ -496,7 +496,7 @@
 
     <div id="music-ui">
         <p style="font-size: 0.8em; color: var(--prompt-color); margin-bottom: 0.8em;">
-            now playing: <br>
+            <span id="now-playing-label" style="cursor: pointer;">now playing:</span> <br>
             <span id="track-title" style="color: var(--text-color);">loading...</span>
         </p>
 
@@ -546,6 +546,7 @@
     <div id="queue-results" style="margin-top: 0.5em; margin-bottom: 0; line-height: 1.8;"></div>
 </div>
 
+<!-- DEPRECATED: playlist-box is legacy custom range builder UI -->
 <div id="playlist-box" class="menu-box scrollable focus-hide">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0;">

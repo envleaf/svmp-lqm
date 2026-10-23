@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const indexingModal = document.getElementById('indexing-modal');
     const indexingDirPath = document.getElementById('indexing-dir-path');
     const indexingCancelBtn = document.getElementById('indexing-cancel-btn');
+    const nowPlayingLabel = document.getElementById('now-playing-label');
     const trackTitleDisplay = document.getElementById('track-title');
     const timeCurrent = document.getElementById('time-current');
     const timeTotal = document.getElementById('time-total');
@@ -813,10 +814,38 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     };
 
+    function updateNowPlayingHeader() {
+        if (!nowPlayingLabel) return;
+        if (pm.activePlaylistName) {
+            nowPlayingLabel.innerText = ui.t(`now playing (${pm.activePlaylistName}):`);
+        } else {
+            nowPlayingLabel.innerText = ui.t(`now playing:`);
+        }
+    }
+
+    if (nowPlayingLabel) {
+        nowPlayingLabel.addEventListener('click', e => {
+            e.preventDefault();
+            if (pm.activePlaylistName) {
+                pm.exitPlaylistQueue();
+                updateNowPlayingHeader();
+                renderGlobalIndex();
+                renderCustomPlaylistIndex();
+                renderQueueIndex();
+                if (searchInput.value) executeSearch();
+                if (ui && ui.showNotification) {
+                    ui.showNotification("Playlist queue ended.");
+                }
+            }
+        });
+    }
+
     window.liveClearPlaylist = function() {
         pm.activeIndices = [];
         pm.playlist.length = 0;
+        pm.activePlaylistName = null;
         pm.resetQueueAndPosition();
+        updateNowPlayingHeader();
         renderGlobalIndex();
         renderCustomPlaylistIndex();
         renderQueueIndex();
@@ -1219,6 +1248,10 @@ document.addEventListener("DOMContentLoaded", function() {
             renderQueueIndex();
             if (searchInput.value) executeSearch();
         } else if (e.button === 0) { // Left click
+            if (pm.activePlaylistName) {
+                pm.exitPlaylistQueue();
+                updateNowPlayingHeader();
+            }
             consecutiveErrorCount = 0;
             pm.playTrackByGlobalIndex(globalIdx);
             loadTrack();
@@ -1442,14 +1475,20 @@ document.addEventListener("DOMContentLoaded", function() {
         });
 
         pm.isCustomMode = true;
+        pm.activePlaylistName = currentViewingPlaylist;
         pm.activeIndices = newActiveIndices;
         pm.playTrackByGlobalIndex(newActiveIndices[targetLocalIdx]);
 
+        updateNowPlayingHeader();
         renderGlobalIndex();
         renderCustomPlaylistIndex();
         renderQueueIndex();
         loadTrack();
         playAudio();
+
+        if (ui && ui.showNotification) {
+            ui.showNotification('Press "now playing" to cancel the playlist queue.');
+        }
 
         listsModal.style.display = 'none';
         if (window.CommandPalette) window.CommandPalette.setOutput(`playing from ${currentViewingPlaylist}`);
@@ -1905,6 +1944,7 @@ document.addEventListener("DOMContentLoaded", function() {
     document.getElementById('playlist-clear').addEventListener('click', e => {
         e.preventDefault();
         pm.clearCustomPlaylist();
+        updateNowPlayingHeader();
         playlistInput.value = '';
         statusText.innerText = "";
         loadTrack();
@@ -2086,7 +2126,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         let lines = [
             `+-- STATS FOR NERDS --------------------+`,
-            `| Version: svmp-lqm 0.0.59 (nightly-lqm)`,
+            `| Version: svmp-lqm 0.0.60 (nightly-lqm)`,
             `| FPS: ${currentFps}`,
             `| Audio State: ${stateStr}`,
             `| Audio Position: ${posStr}`,
@@ -2638,6 +2678,7 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     // Boot up UI render
+    updateNowPlayingHeader();
     updateOptionsUI();
     updateFxUI();
     renderGlobalIndex();
