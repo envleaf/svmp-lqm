@@ -1757,8 +1757,16 @@ document.addEventListener("DOMContentLoaded", function() {
         let clickX = e.clientX - rect.left - 8;
         let percent = Math.max(0, Math.min(1, clickX / (rect.width - 16)));
         ae.setMuted(false);
-        volBar.innerText = ae.setVolume(percent);
+        ae.setVolume(percent);
     });
+
+    volBar.addEventListener('wheel', e => {
+        e.preventDefault();
+        ae.setMuted(false);
+        let step = e.deltaY < 0 ? 0.05 : -0.05;
+        let currentVol = ae.getVolume();
+        ae.setVolume(currentVol + step);
+    }, { passive: false });
 
     asciiBar.addEventListener('click', e => {
         if (audioEl.duration) {
@@ -2286,13 +2294,13 @@ document.addEventListener("DOMContentLoaded", function() {
             case 'NumpadSubtract':
                 e.preventDefault();
                 ae.setMuted(false);
-                volBar.innerText = ae.setVolume(ae.getVolume() - 0.1);
+                ae.setVolume(ae.getVolume() - 0.1);
                 break;
             case 'Equal':
             case 'NumpadAdd':
                 e.preventDefault();
                 ae.setMuted(false);
-                volBar.innerText = ae.setVolume(ae.getVolume() + 0.1);
+                ae.setVolume(ae.getVolume() + 0.1);
                 break;
             case 'Digit0':
                 e.preventDefault();
@@ -2318,7 +2326,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 break;
             case 'Digit4':
                 e.preventDefault();
-                volBar.innerText = ae.toggleMute();
+                ae.toggleMute();
                 break;
             case 'Digit6':
                 e.preventDefault();
