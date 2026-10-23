@@ -5,16 +5,15 @@ import (
 	"log"
 	"path/filepath"
 
-
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 	"github.com/godbus/dbus/v5/prop"
 )
 
 const (
-	mprisPath          = "/org/mpris/MediaPlayer2"
-	mprisNamePrefix    = "org.mpris.MediaPlayer2.svmp_lqm"
-	mprisRootInterface = "org.mpris.MediaPlayer2"
+	mprisPath            = "/org/mpris/MediaPlayer2"
+	mprisNamePrefix      = "org.mpris.MediaPlayer2.svmp_lqm"
+	mprisRootInterface   = "org.mpris.MediaPlayer2"
 	mprisPlayerInterface = "org.mpris.MediaPlayer2.Player"
 )
 
@@ -70,8 +69,8 @@ func (p *mprisPlayer) Play() *dbus.Error {
 }
 
 func (p *mprisPlayer) Seek(offset int64) *dbus.Error {
-    // offset in microseconds
-    seconds := float64(offset) / 1000000.0
+	// offset in microseconds
+	seconds := float64(offset) / 1000000.0
 	w.Dispatch(func() {
 		w.Eval(fmt.Sprintf("if(window.PlayerController && window.PlayerController.seekRelative) window.PlayerController.seekRelative(%f); else if (window.PlayerController) { let a = document.getElementById('audio-element'); if(a) window.PlayerController.seek(a.currentTime + %f); }", seconds, seconds))
 	})
@@ -79,8 +78,8 @@ func (p *mprisPlayer) Seek(offset int64) *dbus.Error {
 }
 
 func (p *mprisPlayer) SetPosition(trackId dbus.ObjectPath, position int64) *dbus.Error {
-    // position in microseconds
-    seconds := float64(position) / 1000000.0
+	// position in microseconds
+	seconds := float64(position) / 1000000.0
 	w.Dispatch(func() {
 		w.Eval(fmt.Sprintf("if(window.PlayerController) window.PlayerController.seek(%f);", seconds))
 	})
@@ -118,10 +117,10 @@ func initMpris() {
 
 	propsMap := map[string]map[string]*prop.Prop{
 		mprisRootInterface: {
-			"CanQuit":      {false, false, prop.EmitTrue, nil},
-			"CanRaise":     {false, false, prop.EmitTrue, nil},
-			"HasTrackList": {false, false, prop.EmitTrue, nil},
-			"Identity":     {"SVMP (LQM)", false, prop.EmitTrue, nil},
+			"CanQuit":             {false, false, prop.EmitTrue, nil},
+			"CanRaise":            {false, false, prop.EmitTrue, nil},
+			"HasTrackList":        {false, false, prop.EmitTrue, nil},
+			"Identity":            {"SVMP (LQM)", false, prop.EmitTrue, nil},
 			"SupportedUriSchemes": {[]string{"file"}, false, prop.EmitTrue, nil},
 			"SupportedMimeTypes":  {[]string{"audio/mpeg", "audio/flac", "audio/wav", "audio/ogg", "audio/mp4"}, false, prop.EmitTrue, nil},
 		},
@@ -133,22 +132,22 @@ func initMpris() {
 			"Metadata": {map[string]dbus.Variant{
 				"mpris:trackid": dbus.MakeVariant(dbus.ObjectPath("/org/mpris/MediaPlayer2/TrackList/NoTrack")),
 			}, false, prop.EmitTrue, nil},
-			"Volume":       {1.0, true, prop.EmitTrue, func(c *prop.Change) *dbus.Error {
-                vol := c.Value.(float64)
-                w.Dispatch(func() {
-                    w.Eval(fmt.Sprintf("if(window.AudioEngine) window.AudioEngine.setVolume(%f);", vol))
-                })
-                return nil
-            }},
-			"Position":     {int64(0), false, prop.EmitFalse, nil},
-			"MinimumRate":  {1.0, false, prop.EmitTrue, nil},
-			"MaximumRate":  {1.0, false, prop.EmitTrue, nil},
-			"CanGoNext":    {true, false, prop.EmitTrue, nil},
+			"Volume": {1.0, true, prop.EmitTrue, func(c *prop.Change) *dbus.Error {
+				vol := c.Value.(float64)
+				w.Dispatch(func() {
+					w.Eval(fmt.Sprintf("if(window.AudioEngine) window.AudioEngine.setVolume(%f);", vol))
+				})
+				return nil
+			}},
+			"Position":      {int64(0), false, prop.EmitFalse, nil},
+			"MinimumRate":   {1.0, false, prop.EmitTrue, nil},
+			"MaximumRate":   {1.0, false, prop.EmitTrue, nil},
+			"CanGoNext":     {true, false, prop.EmitTrue, nil},
 			"CanGoPrevious": {true, false, prop.EmitTrue, nil},
-			"CanPlay":      {true, false, prop.EmitTrue, nil},
-			"CanPause":     {true, false, prop.EmitTrue, nil},
-			"CanSeek":      {true, false, prop.EmitTrue, nil},
-			"CanControl":   {true, false, prop.EmitTrue, nil},
+			"CanPlay":       {true, false, prop.EmitTrue, nil},
+			"CanPause":      {true, false, prop.EmitTrue, nil},
+			"CanSeek":       {true, false, prop.EmitTrue, nil},
+			"CanControl":    {true, false, prop.EmitTrue, nil},
 		},
 	}
 
@@ -158,7 +157,7 @@ func initMpris() {
 		log.Println("Failed to export MPRIS properties:", errProps)
 		return
 	}
-    player.props = mprisProps
+	player.props = mprisProps
 
 	node := &introspect.Node{
 		Name: mprisPath,
@@ -229,23 +228,23 @@ func updateMprisMetadata(title, artist, path string) {
 		if path != "" {
 			fileURI := "file://" + filepath.ToSlash(path)
 			metadata["xesam:url"] = dbus.MakeVariant(fileURI)
-            // Use local HTTP art server for MPRIS artUrl
-            // It will fetch metadata from the file via `github.com/dhowden/tag`
-            artUrl := fmt.Sprintf("http://127.0.0.1:%s/art?path=%s", localServerPort, path)
-            metadata["mpris:artUrl"] = dbus.MakeVariant(artUrl)
+			// Use local HTTP art server for MPRIS artUrl
+			// It will fetch metadata from the file via `github.com/dhowden/tag`
+			artUrl := fmt.Sprintf("http://127.0.0.1:%s/art?path=%s", localServerPort, path)
+			metadata["mpris:artUrl"] = dbus.MakeVariant(artUrl)
 		}
 		mprisProps.SetMust(mprisPlayerInterface, "Metadata", metadata)
 	}
 }
 
 func updateMprisPosition(posMicroseconds int64) {
-    if mprisProps != nil {
-        mprisProps.SetMust(mprisPlayerInterface, "Position", posMicroseconds)
-    }
+	if mprisProps != nil {
+		mprisProps.SetMust(mprisPlayerInterface, "Position", posMicroseconds)
+	}
 }
 
 func updateMprisSeeked(posMicroseconds int64) {
-    if mprisConn != nil {
-        mprisConn.Emit(mprisPath, mprisPlayerInterface+".Seeked", posMicroseconds)
-    }
+	if mprisConn != nil {
+		mprisConn.Emit(mprisPath, mprisPlayerInterface+".Seeked", posMicroseconds)
+	}
 }

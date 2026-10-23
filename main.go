@@ -56,6 +56,254 @@ var execDir string
 var configPath string
 var serverStartTime time.Time
 
+type PlaylistInfo struct {
+	Name       string `json:"name"`
+	TrackCount int    `json:"trackCount"`
+}
+
+func sanitizePlaylistName(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	var sb strings.Builder
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			sb.WriteRune(r)
+		}
+	}
+	return sb.String()
+}
+
+func ensurePlaylistDir() string {
+	playlistsDir := filepath.Join(execDir, "playlists")
+	_ = os.MkdirAll(playlistsDir, 0755)
+	favPath := filepath.Join(playlistsDir, "favorites.txt")
+	if _, err := os.Stat(favPath); os.IsNotExist(err) {
+		_ = os.WriteFile(favPath, []byte(""), 0644)
+	}
+	return playlistsDir
+}
+
+func goListPlaylists() []PlaylistInfo {
+	playlistsDir := ensurePlaylistDir()
+	entries, err := os.ReadDir(playlistsDir)
+	if err != nil {
+		return []PlaylistInfo{{Name: "favorites", TrackCount: 0}}
+	}
+
+	var list []PlaylistInfo
+	favFound := false
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".txt") {
+			continue
+		}
+		name := strings.TrimSuffix(entry.Name(), ".txt")
+		sName := sanitizePlaylistName(name)
+		if sName == "" {
+			continue
+		}
+		tracks := goGetPlaylistTracks(sName)
+		info := PlaylistInfo{
+			Name:       sName,
+			TrackCount: len(tracks),
+		}
+		if sName == "favorites" {
+			favFound = true
+			list = append([]PlaylistInfo{info}, list...)
+		} else {
+			list = append(list, info)
+		}
+	}
+
+	if !favFound {
+		favPath := filepath.Join(playlistsDir, "favorites.txt")
+		_ = os.WriteFile(favPath, []byte(""), 0644)
+		list = append([]PlaylistInfo{{Name: "favorites", TrackCount: 0}}, list...)
+	}
+
+	return list
+}
+
+func goGetPlaylistTracks(playlistName string) []TrackInfo {
+	sName := sanitizePlaylistName(playlistName)
+	if sName == "" {
+		return []TrackInfo{}
+	}
+	playlistsDir := ensurePlaylistDir()
+	filePath := filepath.Join(playlistsDir, sName+".txt")
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return []TrackInfo{}
+	}
+
+	lines := strings.Split(string(data), "\n")
+	var tracks []TrackInfo
+
+	musicDir := selectedMusicDir
+	if musicDir == "" {
+		config := loadConfig()
+		if nd, ok := config["nativeDir"].(string); ok {
+			musicDir = nd
+		}
+	}
+
+	if musicDir == "" {
+		return []TrackInfo{}
+	}
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fullPath := filepath.Join(musicDir, filepath.FromSlash(line))
+		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
+			tracks = append(tracks, parseTrackInfo(fullPath))
+		}
+	}
+
+	return tracks
+}
+
+func goAddTrackToPlaylist(playlistName, trackPath string) bool {
+	sName := sanitizePlaylistName(playlistName)
+	if sName == "" || trackPath == "" {
+		return false
+	}
+
+	musicDir := selectedMusicDir
+	if musicDir == "" {
+		config := loadConfig()
+		if nd, ok := config["nativeDir"].(string); ok {
+			musicDir = nd
+		}
+	}
+	if musicDir == "" {
+		return false
+	}
+
+	cleanTrack := filepath.Clean(trackPath)
+	cleanMusic := filepath.Clean(musicDir)
+
+	relPath, err := filepath.Rel(cleanMusic, cleanTrack)
+	if err != nil || strings.HasPrefix(relPath, "..") || relPath == "." {
+		return false
+	}
+
+	relSlash := filepath.ToSlash(relPath)
+	playlistsDir := ensurePlaylistDir()
+	filePath := filepath.Join(playlistsDir, sName+".txt")
+
+	data, _ := os.ReadFile(filePath)
+	lines := strings.Split(string(data), "\n")
+
+	for _, line := range lines {
+		if strings.TrimSpace(line) == relSlash {
+			return true
+		}
+	}
+
+	content := string(data)
+	if len(content) > 0 && !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+	content += relSlash + "\n"
+
+	err = os.WriteFile(filePath, []byte(content), 0644)
+	return err == nil
+}
+
+func goRemoveTrackFromPlaylist(playlistName, trackPath string) bool {
+	sName := sanitizePlaylistName(playlistName)
+	if sName == "" || trackPath == "" {
+		return false
+	}
+
+	musicDir := selectedMusicDir
+	if musicDir == "" {
+		config := loadConfig()
+		if nd, ok := config["nativeDir"].(string); ok {
+			musicDir = nd
+		}
+	}
+
+	playlistsDir := ensurePlaylistDir()
+	filePath := filepath.Join(playlistsDir, sName+".txt")
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return false
+	}
+
+	var relSlash string
+	if musicDir != "" {
+		if relPath, err := filepath.Rel(filepath.Clean(musicDir), filepath.Clean(trackPath)); err == nil {
+			relSlash = filepath.ToSlash(relPath)
+		}
+	}
+
+	lines := strings.Split(string(data), "\n")
+	var newLines []string
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if relSlash != "" && trimmed == relSlash {
+			continue
+		}
+		if musicDir != "" && filepath.Join(musicDir, filepath.FromSlash(trimmed)) == filepath.Clean(trackPath) {
+			continue
+		}
+		newLines = append(newLines, trimmed)
+	}
+
+	output := ""
+	if len(newLines) > 0 {
+		output = strings.Join(newLines, "\n") + "\n"
+	}
+
+	err = os.WriteFile(filePath, []byte(output), 0644)
+	return err == nil
+}
+
+func goIsFavorite(trackPath string) bool {
+	tracks := goGetPlaylistTracks("favorites")
+	cleanTarget := filepath.Clean(trackPath)
+	for _, t := range tracks {
+		if filepath.Clean(t.OriginalPath) == cleanTarget {
+			return true
+		}
+	}
+	return false
+}
+
+func goCreatePlaylist(playlistName string) bool {
+	sName := sanitizePlaylistName(playlistName)
+	if sName == "" {
+		return false
+	}
+	playlistsDir := ensurePlaylistDir()
+	filePath := filepath.Join(playlistsDir, sName+".txt")
+	if _, err := os.Stat(filePath); err == nil {
+		return true
+	}
+	err := os.WriteFile(filePath, []byte(""), 0644)
+	return err == nil
+}
+
+func goDeletePlaylist(playlistName string) bool {
+	sName := sanitizePlaylistName(playlistName)
+	if sName == "" || sName == "favorites" {
+		return false
+	}
+	playlistsDir := ensurePlaylistDir()
+	filePath := filepath.Join(playlistsDir, sName+".txt")
+	err := os.Remove(filePath)
+	return err == nil || os.IsNotExist(err)
+}
+
 func loadConfig() AppConfig {
 	config := make(AppConfig)
 
@@ -63,6 +311,10 @@ func loadConfig() AppConfig {
 	if err == nil {
 		if err := yaml.Unmarshal(data, &config); err != nil {
 			log.Println("Error parsing svmp-lqm.conf:", err)
+		}
+		if _, exists := config["playlists"]; exists {
+			delete(config, "playlists")
+			saveConfig(config)
 		}
 	} else if os.IsNotExist(err) {
 		// Default config mimicking ConfigManager state
@@ -75,13 +327,13 @@ func loadConfig() AppConfig {
 			"eq": map[string]interface{}{
 				"bass": 0, "mid": 0, "treble": 0,
 			},
-			"isMobile": false,
-			"isSway": false,
-			"clockState": 0,
-			"devMode": false,
-			"visualizer": true,
+			"isMobile":     false,
+			"isSway":       false,
+			"clockState":   0,
+			"devMode":      false,
+			"visualizer":   true,
 			"charOverride": nil,
-			"isUwu": false,
+			"isUwu":        false,
 			"options": map[string]interface{}{
 				"notifications": true, "trackNotif": true, "hintsNotif": true,
 				"notifDuration": 5000, "marqueeSpeed": "normal", "notifPosition": "tl",
@@ -223,6 +475,34 @@ func main() {
 
 	w.Bind("goGetStats", func() string {
 		return getStatsInfo()
+	})
+
+	w.Bind("goListPlaylists", func() []PlaylistInfo {
+		return goListPlaylists()
+	})
+
+	w.Bind("goGetPlaylistTracks", func(playlistName string) []TrackInfo {
+		return goGetPlaylistTracks(playlistName)
+	})
+
+	w.Bind("goAddTrackToPlaylist", func(playlistName, trackPath string) bool {
+		return goAddTrackToPlaylist(playlistName, trackPath)
+	})
+
+	w.Bind("goRemoveTrackFromPlaylist", func(playlistName, trackPath string) bool {
+		return goRemoveTrackFromPlaylist(playlistName, trackPath)
+	})
+
+	w.Bind("goIsFavorite", func(trackPath string) bool {
+		return goIsFavorite(trackPath)
+	})
+
+	w.Bind("goCreatePlaylist", func(playlistName string) bool {
+		return goCreatePlaylist(playlistName)
+	})
+
+	w.Bind("goDeletePlaylist", func(playlistName string) bool {
+		return goDeletePlaylist(playlistName)
 	})
 
 	initMpris()

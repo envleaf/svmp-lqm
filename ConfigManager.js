@@ -11,7 +11,6 @@ window.ConfigManager = (function() {
         isUwu: false,
         options: { notifications: true, trackNotif: true, hintsNotif: true, notifDuration: 5000, marqueeSpeed: 'normal', notifPosition: 'tl', expie: false, timebar: true, fullscreen: false },
         nativeDir: "",
-        playlists: { "Favorites": [] },
         firstRun: true
     };
 
@@ -51,7 +50,7 @@ window.ConfigManager = (function() {
     }
 
     function savePlaylists() {
-        syncState();
+        // Deprecated: Playlists are now managed via Go backend in playlists/*.txt
     }
 
     function saveVisualizer() {
