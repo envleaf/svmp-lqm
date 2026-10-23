@@ -54,6 +54,7 @@ var localServerPort string
 
 var execDir string
 var configPath string
+var serverStartTime time.Time
 
 func loadConfig() AppConfig {
 	config := make(AppConfig)
@@ -105,6 +106,8 @@ func saveConfig(config AppConfig) {
 }
 
 func main() {
+	serverStartTime = time.Now()
+
 	cs := C.CString("svmp-lqm")
 	C.g_set_prgname(cs)
 	C.free(unsafe.Pointer(cs))
@@ -218,6 +221,10 @@ func main() {
 		return getQueryInfo(audioPath)
 	})
 
+	w.Bind("goGetStats", func() string {
+		return getStatsInfo()
+	})
+
 	initMpris()
 
 	// Inject the initial config into the window object
@@ -315,6 +322,38 @@ func listDirectory(path string) {
 	w.Dispatch(func() {
 		w.Eval(js)
 	})
+}
+
+type StatsInfo struct {
+	OS         string  `json:"os"`
+	Arch       string  `json:"arch"`
+	GoVersion  string  `json:"goVersion"`
+	NumCPU     int     `json:"numCpu"`
+	Goroutines int     `json:"goroutines"`
+	MemAlloc   uint64  `json:"memAlloc"`
+	MemSys     uint64  `json:"memSys"`
+	ServerPort string  `json:"serverPort"`
+	UptimeSecs float64 `json:"uptimeSecs"`
+}
+
+func getStatsInfo() string {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	stats := StatsInfo{
+		OS:         runtime.GOOS,
+		Arch:       runtime.GOARCH,
+		GoVersion:  runtime.Version(),
+		NumCPU:     runtime.NumCPU(),
+		Goroutines: runtime.NumGoroutine(),
+		MemAlloc:   m.Alloc,
+		MemSys:     m.Sys,
+		ServerPort: localServerPort,
+		UptimeSecs: time.Since(serverStartTime).Seconds(),
+	}
+
+	data, _ := json.Marshal(stats)
+	return string(data)
 }
 
 func executeFetch() (string, error) {
