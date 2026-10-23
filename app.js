@@ -106,8 +106,6 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }, 1000);
 
-    let isShuffle = false;
-    let shuffleQueue = [];
     let isScpMode = false;
 
     // --- Stars ---
@@ -599,10 +597,10 @@ document.addEventListener("DOMContentLoaded", function() {
                 let beforeMatch = track.title.substring(0, matchStart);
                 let matchText = track.title.substring(matchStart, matchEnd);
                 let afterMatch = track.title.substring(matchEnd);
-                let qPrefix = getQueuePrefix(localIdx);
+                let qPrefix = getQueuePrefix(globalIdx);
 
                 let highlightedTitle = `${ui.t(qPrefix)}${ui.t(beforeMatch)}<span style="background-color: var(--text-color); color: var(--bg-color);">${ui.t(matchText)}</span>${ui.t(afterMatch)}`;
-                html += `<div style="display: flex;"><a href="#" class="info-btn" data-idx="${globalIdx}" style="text-decoration: none; margin-right: 5px;">[i]</a><a href="#" class="search-result-link track-link" data-idx="${localIdx}" style="display: block; text-decoration: none; flex-grow: 1;">| ${num}. ${highlightedTitle}</a></div>`;
+                html += `<div style="display: flex;"><a href="#" class="info-btn" data-idx="${globalIdx}" style="text-decoration: none; margin-right: 5px;">[i]</a><a href="#" class="search-result-link track-link" data-idx="${globalIdx}" style="display: block; text-decoration: none; flex-grow: 1;">| ${num}. ${highlightedTitle}</a></div>`;
                 count++;
             }
         });
@@ -745,7 +743,6 @@ document.addEventListener("DOMContentLoaded", function() {
             if (searchInput.value) executeSearch();
 
             if (wasEmpty) {
-                pm.currentIndex = 0;
                 loadTrack();
                 playAudio();
             }
@@ -764,6 +761,7 @@ document.addEventListener("DOMContentLoaded", function() {
         window._suppressPlaylistReset = false;
         pm.activeIndices = Array.from({length: pm.playlist.length}, (_, i) => i);
         pm.isCustomMode = false;
+        if (wasEmpty) pm.resetQueueAndPosition();
 
         statusText.innerText = "";
         renderGlobalIndex();
@@ -772,7 +770,6 @@ document.addEventListener("DOMContentLoaded", function() {
         if (searchInput.value) executeSearch();
 
         if (wasEmpty) {
-            pm.currentIndex = 0;
             loadTrack();
             playAudio();
         }
@@ -781,7 +778,7 @@ document.addEventListener("DOMContentLoaded", function() {
     window.liveClearPlaylist = function() {
         pm.activeIndices = [];
         pm.playlist.length = 0;
-        pm.currentIndex = 0;
+        pm.resetQueueAndPosition();
         renderGlobalIndex();
         renderCustomPlaylistIndex();
         renderQueueIndex();
@@ -1053,8 +1050,6 @@ document.addEventListener("DOMContentLoaded", function() {
             favBtn.innerText = isFav ? ui.t('[fav (x)]') : ui.t('[fav ( )]');
         }
 
-        pm.pushHistory(pm.currentIndex);
-
         ae.fetchLyrics(
             track.title,
             (name) => { lyricsContent.innerText = ui.t(`fetching lyrics for:\n${name}\n...`); },
@@ -1114,37 +1109,18 @@ document.addEventListener("DOMContentLoaded", function() {
         if (window.goUpdateMprisStatus) window.goUpdateMprisStatus("Paused");
     }
 
-    function generateShuffleQueue() {
-        shuffleQueue = [...Array(pm.activeIndices.length).keys()];
-        let currIdx = shuffleQueue.indexOf(pm.currentIndex);
-        if (currIdx > -1) shuffleQueue.splice(currIdx, 1);
-
-        for (let i = shuffleQueue.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffleQueue[i], shuffleQueue[j]] = [shuffleQueue[j], shuffleQueue[i]];
-        }
-    }
-
     function nextTrack(isUserAction = false) {
         if (isUserAction) consecutiveErrorCount = 0;
         if (pm.activeIndices.length === 0) return;
 
-        let nextFromQueue = pm.popQueue();
-        if (nextFromQueue !== null) {
-            pm.currentIndex = nextFromQueue;
-            // update UI queue indications
-            renderGlobalIndex();
-            renderCustomPlaylistIndex();
-            renderQueueIndex();
-            if(searchInput.value) executeSearch();
-        } else if (isShuffle) {
-            if (shuffleQueue.length === 0) generateShuffleQueue();
-            pm.currentIndex = shuffleQueue.pop();
-        } else {
-            pm.currentIndex = (pm.currentIndex + 1) % pm.activeIndices.length;
-        }
+        pm.nextTrack();
 
         loadTrack();
+        renderGlobalIndex();
+        renderCustomPlaylistIndex();
+        renderQueueIndex();
+        if (searchInput.value) executeSearch();
+
         if (toggleBtn.innerText.includes('pause')) playAudio();
     }
 
@@ -1152,18 +1128,14 @@ document.addEventListener("DOMContentLoaded", function() {
         consecutiveErrorCount = 0;
         if (pm.activeIndices.length === 0) return;
 
-        if (isShuffle || pm.queue.length > 0 || pm.history.length > 1) {
-            let histTrack = pm.popHistory();
-            if (histTrack !== null) {
-                pm.currentIndex = histTrack;
-            } else {
-                pm.currentIndex = (pm.currentIndex - 1 + pm.activeIndices.length) % pm.activeIndices.length;
-            }
-        } else {
-            pm.currentIndex = (pm.currentIndex - 1 + pm.activeIndices.length) % pm.activeIndices.length;
-        }
+        pm.prevTrack();
 
         loadTrack();
+        renderGlobalIndex();
+        renderCustomPlaylistIndex();
+        renderQueueIndex();
+        if (searchInput.value) executeSearch();
+
         if (toggleBtn.innerText.includes('pause')) playAudio();
     }
 
@@ -1172,35 +1144,44 @@ document.addEventListener("DOMContentLoaded", function() {
         if (pm.activeIndices.length === 0) return;
         if (pm.activeIndices.length > 1) {
             let newIndex;
+            let currentGlobal = pm.currentGlobalIdx;
             do {
-                newIndex = Math.floor(Math.random() * pm.activeIndices.length);
-            } while (newIndex === pm.currentIndex);
-            pm.currentIndex = newIndex;
+                newIndex = pm.activeIndices[Math.floor(Math.random() * pm.activeIndices.length)];
+            } while (newIndex === currentGlobal && pm.activeIndices.length > 1);
+            pm.playTrackByGlobalIndex(newIndex);
         }
         loadTrack();
+        renderGlobalIndex();
+        renderCustomPlaylistIndex();
+        renderQueueIndex();
+        if (searchInput.value) executeSearch();
         if (toggleBtn.innerText.includes('pause')) playAudio();
     }
 
-        function getQueuePrefix(idx) {
-        let qIdx = pm.queue.indexOf(idx);
+    function getQueuePrefix(idx) {
+        let qIdx = pm.manualQueue.indexOf(idx);
         return qIdx > -1 ? `(${qIdx + 1}) ` : '';
     }
 
     function handleTrackLinkClick(e, link) {
         e.preventDefault();
-        let idx = parseInt(link.getAttribute('data-idx'), 10);
+        let globalIdx = parseInt(link.getAttribute('data-idx'), 10);
 
         if (e.button === 1) { // Middle click
-            pm.toggleQueue(idx);
+            pm.toggleQueue(globalIdx);
             renderGlobalIndex();
             renderCustomPlaylistIndex();
             renderQueueIndex();
             if (searchInput.value) executeSearch();
         } else if (e.button === 0) { // Left click
             consecutiveErrorCount = 0;
-            pm.currentIndex = idx;
+            pm.playTrackByGlobalIndex(globalIdx);
             loadTrack();
             playAudio();
+            renderGlobalIndex();
+            renderCustomPlaylistIndex();
+            renderQueueIndex();
+            if (searchInput.value) executeSearch();
         }
     }
 
@@ -1414,10 +1395,11 @@ document.addEventListener("DOMContentLoaded", function() {
 
         pm.isCustomMode = true;
         pm.activeIndices = newActiveIndices;
-        pm.currentIndex = targetLocalIdx;
+        pm.playTrackByGlobalIndex(newActiveIndices[targetLocalIdx]);
 
         renderGlobalIndex();
         renderCustomPlaylistIndex();
+        renderQueueIndex();
         loadTrack();
         playAudio();
 
@@ -1487,19 +1469,24 @@ document.addEventListener("DOMContentLoaded", function() {
         const queueResults = document.getElementById('queue-results');
         if (!queueResults) return;
 
-        const q = pm.queue;
+        const queueList = pm.getQueueList();
         const pl = pm.playlist;
 
-        if (q.length === 0) {
+        if (queueList.length === 0) {
             queueResults.innerHTML = `<span style="color: var(--prompt-color);">${ui.t("queue is empty.")}</span>`;
             return;
         }
 
         let html = '';
-        q.forEach((globalIdx, qIdx) => {
+        queueList.forEach((globalIdx, qIdx) => {
             let track = pl[globalIdx];
-            let displayNum = qIdx + 1;
-            let line = `| (${displayNum}) ${track.title}`;
+            if (!track) return;
+            let displayNum = String(qIdx + 1).padStart(2, '0');
+            let qPrefix = getQueuePrefix(globalIdx);
+            let isCurrent = (globalIdx === pm.currentGlobalIdx && qIdx === 0);
+            let nowPlayingSuffix = isCurrent ? " [ Now Playing ]" : "";
+            let line = `| ${displayNum}. ${qPrefix}${track.title}${nowPlayingSuffix}`;
+
             html += `<div style="display: flex;"><a href="#" class="info-btn" data-idx="${globalIdx}" style="text-decoration: none; margin-right: 5px;">[i]</a><a href="#" class="track-link" data-idx="${globalIdx}" style="display: block; text-decoration: none; flex-grow: 1;">${ui.t(line)}</a></div>`;
         });
 
@@ -1534,17 +1521,13 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     function removeTrackAction(globalIdx) {
+        let isCurrent = (pm.currentGlobalIdx === globalIdx);
         if (pm.removeTrack(globalIdx)) {
-            if (pm.currentIndex >= pm.activeIndices.length) {
-                pm.currentIndex = Math.max(0, pm.activeIndices.length - 1);
-            }
-
             let activeTrack = pm.getActiveTrack();
             if (!activeTrack && !audioEl.paused) {
                 pauseAudio();
                 audioEl.removeAttribute('src');
-            } else if (activeTrack && activeTrack.src !== audioEl.src) {
-                 // The currently playing track was removed, and we shifted to a new one
+            } else if (isCurrent && activeTrack) {
                  pauseAudio();
                  loadTrack();
                  if (toggleBtn.innerText.includes('pause')) playAudio();
@@ -1609,12 +1592,15 @@ document.addEventListener("DOMContentLoaded", function() {
 
     document.getElementById('song-info-play').addEventListener('click', e => {
         e.preventDefault();
-        let localIdx = pm.activeIndices.indexOf(currentInfoIdx);
-        if (localIdx !== -1) {
+        if (currentInfoIdx !== -1) {
             consecutiveErrorCount = 0;
-            pm.currentIndex = localIdx;
+            pm.playTrackByGlobalIndex(currentInfoIdx);
             loadTrack();
             playAudio();
+            renderGlobalIndex();
+            renderCustomPlaylistIndex();
+            renderQueueIndex();
+            if (searchInput.value) executeSearch();
             infoModal.style.display = 'none';
         }
     });
@@ -1656,7 +1642,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (searchInput.value) executeSearch();
 
                 if (wasEmpty) {
-                    pm.currentIndex = 0;
                     loadTrack();
                     playAudio();
                 }
@@ -1666,7 +1651,6 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // --- Events ---
-    // The change event logic is moved into localInput.onchange property, to allow hooking.
     localInput.onchange = e => {
         handleFileSelection(e.target.files);
         localInput.value = '';
@@ -1717,9 +1701,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
     shuffleBtn.addEventListener('click', e => {
         e.preventDefault();
-        isShuffle = !isShuffle;
-        shuffleBtn.innerText = isShuffle ? ui.t('[shuffle (x)]') : ui.t('[shuffle ( )]');
-        if (isShuffle) generateShuffleQueue();
+        pm.isShuffle = !pm.isShuffle;
+        shuffleBtn.innerText = pm.isShuffle ? ui.t('[shuffle (x)]') : ui.t('[shuffle ( )]');
+        renderQueueIndex();
     });
 
     favBtn.addEventListener('click', e => {
@@ -1746,7 +1730,7 @@ document.addEventListener("DOMContentLoaded", function() {
     infoBtn.addEventListener('click', e => {
         e.preventDefault();
         if (pm.activeIndices.length === 0) return;
-        let globalIdx = pm.activeIndices[pm.currentIndex];
+        let globalIdx = pm.currentGlobalIdx;
         if (globalIdx !== undefined && globalIdx !== -1) {
             openInfoModal(globalIdx);
         }
