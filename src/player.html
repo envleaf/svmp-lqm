@@ -487,7 +487,7 @@
 |  [Esc]     close all menus/modals     |
 |  [/]       toggle this menu           |
 |                                       |
-|  svmp-lqm 0.0.58 (nightly-lqm)        |
+|  svmp-lqm 0.0.59 (nightly-lqm)        |
 +---------------------------------------+</pre>
 </div>
 
@@ -562,7 +562,10 @@
 <div id="search-box" class="menu-box scrollable focus-hide">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0;">+-- track search -----------------------+</pre>
-    <input type="text" id="search-input" placeholder="search active queue..." spellcheck="false" autocomplete="off" style="margin-top:0.5em;">
+    <div style="display: flex; align-items: center; gap: 10px; margin-top: 0.5em; margin-bottom: 10px;">
+        <input type="text" id="search-input" placeholder="search active queue..." spellcheck="false" autocomplete="off" style="margin-bottom: 0; flex-grow: 1;">
+        <a href="#" id="search-queue-all" style="display: none; white-space: nowrap; text-decoration: none;">[ queue all ]</a>
+    </div>
     <div id="search-results" style="margin-top: 0.5em; margin-bottom: 0; line-height: 1.8;"></div>
 </div>
 
@@ -749,9 +752,11 @@
         <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><strong>bitrate:</strong> <span id="song-info-bitrate">...</span></div>
     </div>
 </div>
-<div style="display: flex; gap: 15px; color: var(--text-color);">
+<div style="display: flex; gap: 15px; flex-wrap: wrap; color: var(--text-color);">
     <a href="#" id="song-info-play">[play]</a>
     <a href="#" id="song-info-queue">[add to queue]</a>
+    <a href="#" id="song-info-play-album" style="display: none;">[play from album]</a>
+    <a href="#" id="song-info-play-artist" style="display: none;">[play from artist]</a>
     <a href="#" id="song-info-add-list">[add to list]</a>
     <a href="#" id="song-info-remove" style="color: #ff5555;">[remove]</a>
     <a href="#" id="song-info-close">[close]</a>

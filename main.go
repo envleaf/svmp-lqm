@@ -43,6 +43,7 @@ type TrackInfo struct {
 	Src          string `json:"src"`
 	Title        string `json:"title"`
 	Artist       string `json:"artist"`
+	Album        string `json:"album"`
 	OriginalName string `json:"originalName"`
 	OriginalPath string `json:"originalPath"`
 }
@@ -688,6 +689,7 @@ func parseTrackInfo(path string) TrackInfo {
 		if err == nil && m != nil {
 			info.Title = m.Title()
 			info.Artist = m.Artist()
+			info.Album = m.Album()
 		}
 	}
 	return info

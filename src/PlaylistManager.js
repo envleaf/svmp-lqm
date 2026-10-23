@@ -82,6 +82,7 @@ window.PlaylistManager = (function() {
             src: trackData.src,
             title: parsedTitle || "Unknown",
             artist: trackData.artist || '',
+            album: trackData.album || '',
             originalPath: trackData.originalPath || ''
         };
 
@@ -110,7 +111,7 @@ window.PlaylistManager = (function() {
             let cleanName = file.name.replace(/\.[^/.]+$/, "");
             if (cleanName.length > 35) cleanName = cleanName.substring(0, 32) + "...";
 
-            let trackData = { file: file, src: fileURL, title: cleanName, artist: '' };
+            let trackData = { file: file, src: fileURL, title: cleanName, artist: '', album: '' };
             let addedIndex = playlist.length;
             playlist.push(trackData);
 
@@ -123,6 +124,9 @@ window.PlaylistManager = (function() {
                             if (parsedTitle.length > 35) parsedTitle = parsedTitle.substring(0, 32) + "...";
                             playlist[addedIndex].title = parsedTitle;
                             playlist[addedIndex].artist = tag.tags.artist || '';
+                        }
+                        if (tag.tags.album) {
+                            playlist[addedIndex].album = tag.tags.album || '';
                         }
                         filesProcessed++;
                         checkDone();
@@ -209,6 +213,24 @@ window.PlaylistManager = (function() {
             // Remove from upcomingQueue if present
             upcomingQueue = upcomingQueue.filter(gIdx => gIdx !== globalIdx);
         }
+    }
+
+    function prependToQueue(indices, shouldShuffle = false) {
+        if (!indices || indices.length === 0) return;
+        let list = [...indices];
+        if (shouldShuffle) {
+            list = shuffleArray(list);
+        }
+        // Exclude currently playing track if audio is active so it doesn't repeat immediately
+        let candidates = list;
+        if (currentGlobalIdx !== -1) {
+            candidates = list.filter(gIdx => gIdx !== currentGlobalIdx);
+        }
+        if (candidates.length === 0) candidates = list;
+
+        manualQueue = manualQueue.filter(gIdx => !candidates.includes(gIdx));
+        upcomingQueue = upcomingQueue.filter(gIdx => !candidates.includes(gIdx));
+        manualQueue.unshift(...candidates);
     }
 
     function popQueue() {
@@ -340,6 +362,7 @@ window.PlaylistManager = (function() {
         addFiles,
         removeTrack,
         toggleQueue,
+        prependToQueue,
         popQueue,
         pushHistory,
         popHistory,
