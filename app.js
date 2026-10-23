@@ -1959,6 +1959,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 cm.saveOptions();
                 if (opt === 'timebar') {
                     if (window.updateTimebarDisplay) window.updateTimebarDisplay();
+                } else if (opt === 'fullscreen') {
+                    syncFullscreenState(val);
                 }
             }
             updateOptionsUI();
@@ -2205,6 +2207,12 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // Keybinds
     document.addEventListener('keydown', e => {
+        if (e.key === 'F11') {
+            e.preventDefault();
+            toggleFullscreen();
+            return;
+        }
+
         if (e.code === 'Backquote' && e.target.tagName !== 'INPUT') {
             e.preventDefault();
             cmdPalette.style.display = cmdPalette.style.display === 'block' ? 'none' : 'block';
@@ -2329,6 +2337,56 @@ document.addEventListener("DOMContentLoaded", function() {
                 e.preventDefault();
                 if (audioEl.duration) audioEl.currentTime = Math.min(audioEl.duration || 0, audioEl.currentTime + 5);
                 break;
+        }
+    });
+
+    // --- Fullscreen Engine ---
+    function syncFullscreenState(requestedState) {
+        if (!cm.state.options) cm.state.options = {};
+
+        if (requestedState === undefined) {
+            requestedState = !!cm.state.options.fullscreen;
+        }
+
+        const isCurrentlyFS = !!document.fullscreenElement;
+
+        if (requestedState && !isCurrentlyFS) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.warn("Fullscreen request failed:", err);
+            });
+        } else if (!requestedState && isCurrentlyFS) {
+            document.exitFullscreen().catch(err => {
+                console.warn("Exit fullscreen failed:", err);
+            });
+        }
+
+        cm.state.options.fullscreen = requestedState;
+        cm.saveOptions();
+        updateOptionsUI();
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+        const isFS = !!document.fullscreenElement;
+        if (cm.state.options && cm.state.options.fullscreen !== isFS) {
+            cm.state.options.fullscreen = isFS;
+            cm.saveOptions();
+            updateOptionsUI();
+        }
+    });
+
+    function toggleFullscreen() {
+        const isFS = !!document.fullscreenElement;
+        syncFullscreenState(!isFS);
+    }
+
+    // Auto-restore fullscreen on first user interaction if enabled in config
+    let hasAttemptedInitialFullscreen = false;
+    document.addEventListener('click', () => {
+        if (!hasAttemptedInitialFullscreen) {
+            hasAttemptedInitialFullscreen = true;
+            if (cm.state.options && cm.state.options.fullscreen) {
+                syncFullscreenState(true);
+            }
         }
     });
 

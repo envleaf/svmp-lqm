@@ -1,5 +1,12 @@
 package main
 
+/*
+#cgo pkg-config: glib-2.0
+#include <glib.h>
+#include <stdlib.h>
+*/
+import "C"
+
 import (
 	"context"
 	"encoding/json"
@@ -16,6 +23,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/dhowden/tag"
 	"github.com/fsnotify/fsnotify"
@@ -44,6 +52,7 @@ var selectedMusicDir string
 var w webview.WebView
 var localServerPort string
 
+var execDir string
 var configPath string
 
 func loadConfig() AppConfig {
@@ -75,7 +84,7 @@ func loadConfig() AppConfig {
 			"options": map[string]interface{}{
 				"notifications": true, "trackNotif": true, "hintsNotif": true,
 				"notifDuration": 5000, "marqueeSpeed": "normal", "notifPosition": "tl",
-				"expie": false, "timebar": true,
+				"expie": false, "timebar": true, "fullscreen": false,
 			},
 			"nativeDir": "",
 		}
@@ -96,10 +105,16 @@ func saveConfig(config AppConfig) {
 }
 
 func main() {
+	cs := C.CString("svmp-lqm")
+	C.g_set_prgname(cs)
+	C.free(unsafe.Pointer(cs))
+
 	execPath, err := os.Executable()
 	if err == nil {
-		configPath = filepath.Join(filepath.Dir(execPath), "svmp-lqm.conf")
+		execDir = filepath.Dir(execPath)
+		configPath = filepath.Join(execDir, "svmp-lqm.conf")
 	} else {
+		execDir = "."
 		configPath = "svmp-lqm.conf"
 	}
 
@@ -215,8 +230,8 @@ func main() {
 
 func startServer(listener net.Listener) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Serve static files from current directory
-		http.ServeFile(w, r, filepath.Join(".", r.URL.Path))
+		// Serve static files from executable directory
+		http.ServeFile(w, r, filepath.Join(execDir, r.URL.Path))
 	})
 
 	http.HandleFunc("/audio/", func(w http.ResponseWriter, r *http.Request) {
