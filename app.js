@@ -69,6 +69,7 @@ document.addEventListener("DOMContentLoaded", function() {
 |  <a href="#" id="opt-mobile" style="text-decoration: none;">[ ] mobile layout</a>                    |
 |  <a href="#" id="opt-deck" style="text-decoration: none;">[ ] deck layout</a>                      |
 |  <a href="#" id="opt-focus" style="text-decoration: none;">[ ] focus mode</a>                       |
+|  <a href="#" id="opt-stat-monitor" style="text-decoration: none;">[ ] stat monitor</a>                     |
 |  <a href="#" id="opt-disable-error-skip" style="text-decoration: none;">[ ] disable error skip</a>                 |
 |  <a href="#" id="opt-legacy-playlist" style="text-decoration: none; display: none;">[ ] legacy playlist</a>                  |
 |                                       |
@@ -441,6 +442,7 @@ document.addEventListener("DOMContentLoaded", function() {
         const optMobileBtn = document.getElementById('opt-mobile');
         const optDeckBtn = document.getElementById('opt-deck');
         const optFocusBtn = document.getElementById('opt-focus');
+    const optStatMonitorBtn = document.getElementById('opt-stat-monitor');
         const optLocalBtn = document.getElementById('opt-local');
         const optDisableErrorSkipBtn = document.getElementById('opt-disable-error-skip');
 
@@ -449,6 +451,7 @@ document.addEventListener("DOMContentLoaded", function() {
         if (optMobileBtn) optMobileBtn.innerText = cm.state.isMobile ? ui.t('[x] mobile layout') : ui.t('[ ] mobile layout');
         if (optDeckBtn) optDeckBtn.innerText = cm.state.isSway ? ui.t('[x] deck layout') : ui.t('[ ] deck layout');
         if (optFocusBtn) optFocusBtn.innerText = document.body.classList.contains('focus-mode') ? ui.t('[x] focus mode') : ui.t('[ ] focus mode');
+    if (optStatMonitorBtn) optStatMonitorBtn.innerText = isStatMonitorEnabled ? ui.t('[x] stat monitor') : ui.t('[ ] stat monitor');
         if (optLocalBtn) optLocalBtn.innerText = ui.t('[mode: local]');
         if (dlAddBtn) dlAddBtn.innerText = ui.t(`[${cm.state.nativeDir || '/'}]`);
         if (optDisableErrorSkipBtn) {
@@ -1885,14 +1888,142 @@ document.addEventListener("DOMContentLoaded", function() {
         pauseAudio();
     });
 
+    // --- Stat Monitor Logic ---
+    let isStatMonitorEnabled = false;
+    let fpsCount = 0;
+    let currentFps = 0;
+    let lastFpsTime = performance.now();
+    let statMonitorAnimationFrame = null;
+    let cachedBackendStats = null;
+    let backendStatsInterval = null;
+
+    const statMonitorEl = document.getElementById('stat-monitor');
+
+    function updateFps() {
+        if (!isStatMonitorEnabled) return;
+        fpsCount++;
+        const now = performance.now();
+        if (now - lastFpsTime >= 1000) {
+            currentFps = Math.round((fpsCount * 1000) / (now - lastFpsTime));
+            fpsCount = 0;
+            lastFpsTime = now;
+            renderStatMonitor();
+        }
+        statMonitorAnimationFrame = requestAnimationFrame(updateFps);
+    }
+
+    function fetchBackendStats() {
+        if (!isStatMonitorEnabled) return;
+        if (window.goGetStats) {
+            const res = window.goGetStats();
+            const handleRes = (dataStr) => {
+                try {
+                    cachedBackendStats = typeof dataStr === 'string' ? JSON.parse(dataStr) : dataStr;
+                } catch (e) {
+                    cachedBackendStats = null;
+                }
+                renderStatMonitor();
+            };
+            if (res && typeof res.then === 'function') {
+                res.then(handleRes);
+            } else {
+                handleRes(res);
+            }
+        } else {
+            renderStatMonitor();
+        }
+    }
+
+    function formatBytes(bytes) {
+        if (!bytes || bytes <= 0) return '0 B';
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + sizes[i];
+    }
+
+    function formatDuration(seconds) {
+        if (isNaN(seconds) || seconds < 0) return '0s';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        let parts = [];
+        if (h > 0) parts.push(`${h}h`);
+        if (m > 0 || h > 0) parts.push(`${m}m`);
+        parts.push(`${s}s`);
+        return parts.join(' ');
+    }
+
+    function renderStatMonitor() {
+        if (!isStatMonitorEnabled || !statMonitorEl) return;
+
+        const activeTrack = pm.getActiveTrack();
+        const stateStr = audioEl.paused ? (audioEl.currentTime > 0 ? 'Paused' : 'Stopped') : 'Playing';
+        const posStr = `${formatTime(audioEl.currentTime)} / ${formatTime(audioEl.duration)}`;
+
+        let lines = [
+            `+-- STATS FOR NERDS --------------------+`,
+            `| Version: svmp-lqm 0.0.56 (nightly-lqm)`,
+            `| FPS: ${currentFps}`,
+            `| Audio State: ${stateStr}`,
+            `| Audio Position: ${posStr}`,
+            `| Volume: ${Math.round(ae.getVolume() * 100)}% (Muted: ${ae.getMuted()})`
+        ];
+
+        if (activeTrack) {
+            lines.push(`| Active Track: ${activeTrack.title || activeTrack.originalName || 'Unknown'}`);
+        }
+
+        if (cachedBackendStats) {
+            const bs = cachedBackendStats;
+            lines.push(`| OS/Arch: ${bs.os}/${bs.arch} (${bs.numCpu} CPUs)`);
+            lines.push(`| Go Runtime: ${bs.goVersion} (${bs.goroutines} goroutines)`);
+            lines.push(`| Go Mem Alloc: ${formatBytes(bs.memAlloc)} / Sys: ${formatBytes(bs.memSys)}`);
+            lines.push(`| Server Port: ${bs.serverPort}`);
+            lines.push(`| Server Uptime: ${formatDuration(bs.uptimeSecs)}`);
+        } else {
+            lines.push(`| Backend: Browser Mode (No Go Server)`);
+        }
+
+        lines.push(`+---------------------------------------+`);
+
+        statMonitorEl.innerText = lines.join('\n');
+    }
+
+    function toggleStatMonitor() {
+        isStatMonitorEnabled = !isStatMonitorEnabled;
+        if (statMonitorEl) {
+            statMonitorEl.style.display = isStatMonitorEnabled ? 'block' : 'none';
+        }
+
+        if (isStatMonitorEnabled) {
+            fpsCount = 0;
+            lastFpsTime = performance.now();
+            updateFps();
+            fetchBackendStats();
+            backendStatsInterval = setInterval(fetchBackendStats, 1000);
+        } else {
+            if (statMonitorAnimationFrame) {
+                cancelAnimationFrame(statMonitorAnimationFrame);
+                statMonitorAnimationFrame = null;
+            }
+            if (backendStatsInterval) {
+                clearInterval(backendStatsInterval);
+                backendStatsInterval = null;
+            }
+        }
+        updateOptionsUI();
+    }
+
     // UI Toggles
     const optMobileBtn = document.getElementById('opt-mobile');
     const optDeckBtn = document.getElementById('opt-deck');
     const optFocusBtn = document.getElementById('opt-focus');
+    const optStatMonitorBtn = document.getElementById('opt-stat-monitor');
     const optResetBtn = document.getElementById('opt-reset');
     const optDisableErrorSkipBtn = document.getElementById('opt-disable-error-skip');
 
     if (optMobileBtn) optMobileBtn.addEventListener('click', e => { e.preventDefault(); cm.state.isMobile = !cm.state.isMobile; if(cm.state.isMobile) cm.state.isSway = false; localStorage.setItem('env_mobile', cm.state.isMobile); updateOptionsUI(); });
+    if (optStatMonitorBtn) optStatMonitorBtn.addEventListener('click', e => { e.preventDefault(); toggleStatMonitor(); });
     if (optDisableErrorSkipBtn) optDisableErrorSkipBtn.addEventListener('click', e => {
         e.preventDefault();
         if (!cm.state.options) cm.state.options = {};

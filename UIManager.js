@@ -22,7 +22,7 @@ window.UIManager = (function() {
         while ((node = walker.nextNode())) {
             let parentTag = node.parentElement ? node.parentElement.tagName : '';
             if (['SCRIPT', 'STYLE', 'INPUT', 'TEXTAREA'].includes(parentTag)) continue;
-            if (node.parentElement && node.parentElement.closest('#track-title, #time-current, #time-total, #ascii-bar, #lyrics-content, #playlist-status-text, #index-box, #index-results, #custom-index-box, #search-results, #vol-bar, #eq-bass-bar, #eq-mid-bar, #eq-treble-bar, #scp-text, #clock-display, #keybind-modal, #welcome-modal, #dev-modal, #cmd-palette')) continue;
+            if (node.parentElement && node.parentElement.closest('#track-title, #time-current, #time-total, #ascii-bar, #lyrics-content, #playlist-status-text, #index-box, #index-results, #custom-index-box, #search-results, #vol-bar, #eq-bass-bar, #eq-mid-bar, #eq-treble-bar, #scp-text, #clock-display, #keybind-modal, #welcome-modal, #dev-modal, #cmd-palette, #stat-monitor')) continue;
 
             if (node.nodeValue.trim() !== "") originalTextNodes.set(node, node.nodeValue);
         }
