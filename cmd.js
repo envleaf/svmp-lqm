@@ -59,6 +59,7 @@ window.CommandPalette = (function() {
                             case 'play': setOutput("play [index] : plays a song based on track number as appears in index. resumes playback if no index passed."); break;
                             case 'pause': setOutput("pause : pauses the playback."); break;
                             case 'stop': setOutput("stop : pauses playback and sets song progress to zero."); break;
+                            case 'vol': setOutput("vol <0-100> : sets volume percentage or displays current volume."); break;
                             case 'config': setOutput("config <set/reset/export/import> : sets a config value directly in config.json. 'reset' sets config to default."); break;
                             case 'del': setOutput("del <-p> <index> : removes a file from the global index. with -p, deletes it from playlist index instead."); break;
                             case 'upload': setOutput("upload <-p> : opens upload file dialogue. with -p, instantly adds to playlist queue."); break;
@@ -71,7 +72,7 @@ window.CommandPalette = (function() {
                             default: setOutput(`Unknown help topic: ${topic}`, true); break;
                         }
                     } else {
-                        setOutput("Commands: net, play, pause, stop, config, del, upload, dev, msg, time, fetch, query, kill, help.\nType 'help <command>' for details.");
+                        setOutput("Commands: net, play, pause, stop, vol, config, del, upload, dev, msg, time, fetch, query, kill, help.\nType 'help <command>' for details.");
                     }
                     break;
 
@@ -380,6 +381,24 @@ window.CommandPalette = (function() {
                     pc.pauseAudio();
                     pc.seek(0);
                     setOutput("Playback stopped.");
+                    break;
+
+                case 'vol':
+                    if (args[1] !== undefined) {
+                        let volNum = parseInt(args[1], 10);
+                        if (!isNaN(volNum)) {
+                            volNum = Math.max(0, Math.min(100, volNum));
+                            ae.setMuted(false);
+                            ae.setVolume(volNum / 100);
+                            setOutput(`Volume set to ${volNum}%.`);
+                        } else {
+                            setOutput("Usage: vol <0-100>", true);
+                        }
+                    } else {
+                        let currentPct = Math.round(ae.getVolume() * 100);
+                        let isM = ae.getMuted();
+                        setOutput(`Current volume: ${currentPct}%${isM ? ' (muted)' : ''}`);
+                    }
                     break;
 
                 case 'dev':

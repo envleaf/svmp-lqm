@@ -1,24 +1,40 @@
 window.AudioEngine = (function() {
     let audio = null;
     let audioCtx = null;
+    let gainNode = null;
     let bassFilter, midFilter, trebleFilter, analyser;
     let isMuted = false;
     let vizInterval = null;
     let dataArray = null;
     const volLength = 10;
+    let currentVolume = 0.5;
 
     // Lyrics state
     let currentParsedLyrics = [];
 
     function init(audioElement) {
         audio = audioElement;
-        // set up dual-sync listeners removed, only single audio element now
+        let savedVol = localStorage.getItem('env_vol');
+        if (savedVol !== null) {
+            let parsedVol = parseFloat(savedVol);
+            if (!isNaN(parsedVol)) {
+                currentVolume = Math.max(0, Math.min(1, parsedVol));
+            }
+        }
+        let savedMute = localStorage.getItem('env_mute');
+        if (savedMute !== null) {
+            isMuted = (savedMute === 'true');
+        }
+        setVolume(currentVolume);
     }
 
     function initAudioAPI(eqState) {
         if (audioCtx) return;
         try {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+            gainNode = audioCtx.createGain();
+            gainNode.gain.value = isMuted ? 0 : currentVolume;
 
             bassFilter = audioCtx.createBiquadFilter();
             bassFilter.type = "lowshelf";
@@ -40,7 +56,8 @@ window.AudioEngine = (function() {
             dataArray = new Uint8Array(analyser.frequencyBinCount);
 
             let source = audioCtx.createMediaElementSource(audio);
-            source.connect(bassFilter);
+            source.connect(gainNode);
+            gainNode.connect(bassFilter);
             bassFilter.connect(midFilter);
             midFilter.connect(trebleFilter);
             trebleFilter.connect(analyser);
@@ -72,31 +89,47 @@ window.AudioEngine = (function() {
 
     function setVolume(val) {
         let v = Math.max(0, Math.min(1, val));
-        audio.volume = v;
+        currentVolume = v;
+        if (audio) {
+            audio.volume = v;
+        }
+        if (gainNode && audioCtx) {
+            gainNode.gain.value = isMuted ? 0 : v;
+        }
         localStorage.setItem('env_vol', v);
+        localStorage.setItem('env_mute', isMuted);
 
         let displayStr = "";
         if (isMuted) {
-            audio.muted = true;
+            if (audio) audio.muted = true;
             displayStr = '[   MUTE   ]';
         } else {
-            audio.muted = false;
+            if (audio) audio.muted = false;
             let fillCount = Math.round(v * volLength);
-            let state = window.ConfigManager.state;
-            let cFill = (state.fx.kawaii || state.isUwu) ? '♥' : '|';
-            let cEmpty = (state.fx.kawaii || state.isUwu) ? '♡' : '.';
+            let state = (window.ConfigManager && window.ConfigManager.state) ? window.ConfigManager.state : { fx: {}, isUwu: false };
+            let cFill = (state.fx && (state.fx.kawaii || state.isUwu)) ? '♥' : '|';
+            let cEmpty = (state.fx && (state.fx.kawaii || state.isUwu)) ? '♡' : '.';
             displayStr = '[' + cFill.repeat(fillCount) + cEmpty.repeat(volLength - fillCount) + ']';
         }
+
+        const volBar = document.getElementById('vol-bar');
+        if (volBar) {
+            volBar.innerText = displayStr;
+        }
+
         return displayStr;
     }
 
     function toggleMute() {
         isMuted = !isMuted;
-        return setVolume(audio.volume);
+        return setVolume(currentVolume);
     }
 
-    function getVolume() { return audio.volume; }
-    function setMuted(m) { isMuted = m; }
+    function getVolume() { return currentVolume; }
+    function setMuted(m) {
+        isMuted = m;
+        setVolume(currentVolume);
+    }
     function getMuted() { return isMuted; }
 
     async function fetchLyrics(trackName, onStart, onSuccess, onFail, onEmpty) {
