@@ -111,10 +111,8 @@ do_install() {
 
     # Move binary and assets to ~/.config/svmp-lqm
     cp -f svmp-lqm "$INSTALL_DIR/"
-    cp -f player.html "$INSTALL_DIR/" 2>/dev/null || true
-    cp -f *.js "$INSTALL_DIR/" 2>/dev/null || true
-    cp -f *.css "$INSTALL_DIR/" 2>/dev/null || true
-    cp -f *.png "$INSTALL_DIR/" 2>/dev/null || true
+    mkdir -p "$INSTALL_DIR/src"
+    cp -rf src/* "$INSTALL_DIR/src/"
 
     # Move config if present locally or preserve existing config
     if [ -f "svmp-lqm.conf" ] && [ ! -f "$INSTALL_DIR/svmp-lqm.conf" ]; then
@@ -131,7 +129,7 @@ Type=Application
 Name=SVMP (LQM)
 Comment=Local music player
 Exec=$INSTALL_DIR/svmp-lqm
-Icon=$INSTALL_DIR/svmp-lqm.png
+Icon=$INSTALL_DIR/src/svmp-lqm.png
 Terminal=false
 Categories=AudioVideo;Audio;Player;Music;
 StartupWMClass=svmp-lqm
