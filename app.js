@@ -1049,11 +1049,15 @@ document.addEventListener("DOMContentLoaded", function() {
 
         // Update fav button UI
         if (favBtn) {
-            let isFav = false;
             if (window.goIsFavorite && track.originalPath) {
-                isFav = window.goIsFavorite(track.originalPath);
+                Promise.resolve(window.goIsFavorite(track.originalPath)).then(isFav => {
+                    favBtn.innerText = isFav ? ui.t('[fav (x)]') : ui.t('[fav ( )]');
+                }).catch(() => {
+                    favBtn.innerText = ui.t('[fav ( )]');
+                });
+            } else {
+                favBtn.innerText = ui.t('[fav ( )]');
             }
-            favBtn.innerText = isFav ? ui.t('[fav (x)]') : ui.t('[fav ( )]');
         }
 
         ae.fetchLyrics(
@@ -1220,7 +1224,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     listsModalCreate.addEventListener('click', e => {
         e.preventDefault();
-        promptUser("enter playlist name (letters/numbers only):", (name) => {
+        promptUser("enter playlist name (letters/numbers only):", async (name) => {
             if (!name) return;
             let cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
             if (!cleanName) {
@@ -1230,7 +1234,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
             if (currentListsView === 'add') {
                 if (window.goAddTrackToPlaylist && trackToAdd) {
-                    let success = window.goAddTrackToPlaylist(cleanName, trackToAdd.originalPath);
+                    let success = await window.goAddTrackToPlaylist(cleanName, trackToAdd.originalPath);
                     if (success) {
                         ui.showNotification(`added to ${cleanName}`);
                     } else {
@@ -1240,7 +1244,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 listsModal.style.display = 'none';
             } else {
                 if (window.goCreatePlaylist) {
-                    window.goCreatePlaylist(cleanName);
+                    await window.goCreatePlaylist(cleanName);
                 }
                 openListsModal('main');
             }
@@ -1270,9 +1274,17 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    function renderPlaylistsList() {
+    async function renderPlaylistsList() {
         let html = '';
-        let playlists = window.goListPlaylists ? window.goListPlaylists() : [];
+        let playlists = [];
+        if (window.goListPlaylists) {
+            try {
+                playlists = await window.goListPlaylists();
+            } catch (err) {
+                playlists = [];
+            }
+        }
+        if (!Array.isArray(playlists)) playlists = [];
 
         playlists.forEach(pl => {
             let key = pl.name;
@@ -1294,23 +1306,23 @@ document.addEventListener("DOMContentLoaded", function() {
         listsModalContent.innerHTML = html;
 
         document.querySelectorAll('.del-list-btn').forEach(btn => {
-            btn.addEventListener('click', e => {
+            btn.addEventListener('click', async e => {
                 e.preventDefault();
                 let name = btn.getAttribute('data-name');
                 if(confirm(`delete playlist '${name}'?`)) {
-                    if (window.goDeletePlaylist) window.goDeletePlaylist(name);
+                    if (window.goDeletePlaylist) await window.goDeletePlaylist(name);
                     renderPlaylistsList();
                 }
             });
         });
 
         document.querySelectorAll('.list-link').forEach(link => {
-            link.addEventListener('click', e => {
+            link.addEventListener('click', async e => {
                 e.preventDefault();
                 let name = link.getAttribute('data-name');
                 if (currentListsView === 'add') {
                     if (window.goAddTrackToPlaylist && trackToAdd) {
-                        let success = window.goAddTrackToPlaylist(name, trackToAdd.originalPath);
+                        let success = await window.goAddTrackToPlaylist(name, trackToAdd.originalPath);
                         if (success) {
                             ui.showNotification(`added to ${name}`);
                         } else {
@@ -1325,11 +1337,19 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    function renderPlaylistTracks() {
+    async function renderPlaylistTracks() {
         let html = '';
-        let listTracks = window.goGetPlaylistTracks ? window.goGetPlaylistTracks(currentViewingPlaylist) : [];
+        let listTracks = [];
+        if (window.goGetPlaylistTracks) {
+            try {
+                listTracks = await window.goGetPlaylistTracks(currentViewingPlaylist);
+            } catch (err) {
+                listTracks = [];
+            }
+        }
+        if (!Array.isArray(listTracks)) listTracks = [];
 
-        if (!listTracks || listTracks.length === 0) {
+        if (listTracks.length === 0) {
             listsModalContent.innerHTML = `<span style="color: var(--prompt-color);">${ui.t("playlist is empty or tracks missing.")}</span>`;
             return;
         }
@@ -1345,18 +1365,18 @@ document.addEventListener("DOMContentLoaded", function() {
         listsModalContent.innerHTML = html;
 
         document.querySelectorAll('.del-track-btn').forEach(btn => {
-            btn.addEventListener('click', e => {
+            btn.addEventListener('click', async e => {
                 e.preventDefault();
                 let originalPath = decodeURIComponent(btn.getAttribute('data-path'));
                 if (window.goRemoveTrackFromPlaylist) {
-                    window.goRemoveTrackFromPlaylist(currentViewingPlaylist, originalPath);
+                    await window.goRemoveTrackFromPlaylist(currentViewingPlaylist, originalPath);
                 }
                 renderPlaylistTracks();
 
                 if (currentViewingPlaylist === "favorites") {
                     let playingTrack = pm.getActiveTrack();
                     if (playingTrack && favBtn) {
-                        let isFav = window.goIsFavorite ? window.goIsFavorite(playingTrack.originalPath) : false;
+                        let isFav = window.goIsFavorite ? await window.goIsFavorite(playingTrack.originalPath) : false;
                         favBtn.innerText = isFav ? ui.t('[fav (x)]') : ui.t('[fav ( )]');
                     }
                 }
@@ -1699,17 +1719,17 @@ document.addEventListener("DOMContentLoaded", function() {
         renderQueueIndex();
     });
 
-    favBtn.addEventListener('click', e => {
+    favBtn.addEventListener('click', async e => {
         e.preventDefault();
         let track = pm.getActiveTrack();
         if (!track || !track.originalPath) return;
 
-        let isFav = window.goIsFavorite ? window.goIsFavorite(track.originalPath) : false;
+        let isFav = window.goIsFavorite ? await window.goIsFavorite(track.originalPath) : false;
         if (isFav) {
-            if (window.goRemoveTrackFromPlaylist) window.goRemoveTrackFromPlaylist("favorites", track.originalPath);
+            if (window.goRemoveTrackFromPlaylist) await window.goRemoveTrackFromPlaylist("favorites", track.originalPath);
             favBtn.innerText = ui.t('[fav ( )]');
         } else {
-            if (window.goAddTrackToPlaylist) window.goAddTrackToPlaylist("favorites", track.originalPath);
+            if (window.goAddTrackToPlaylist) await window.goAddTrackToPlaylist("favorites", track.originalPath);
             favBtn.innerText = ui.t('[fav (x)]');
         }
     });
@@ -1946,7 +1966,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         let lines = [
             `+-- STATS FOR NERDS --------------------+`,
-            `| Version: svmp-lqm 0.0.57 (nightly-lqm)`,
+            `| Version: svmp-lqm 0.0.58 (nightly-lqm)`,
             `| FPS: ${currentFps}`,
             `| Audio State: ${stateStr}`,
             `| Audio Position: ${posStr}`,
