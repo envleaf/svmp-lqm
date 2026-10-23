@@ -517,8 +517,8 @@ func main() {
 
 func startServer(listener net.Listener) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Serve static files from executable directory
-		http.ServeFile(w, r, filepath.Join(execDir, r.URL.Path))
+		// Serve static files from src directory inside executable directory
+		http.ServeFile(w, r, filepath.Join(execDir, "src", r.URL.Path))
 	})
 
 	http.HandleFunc("/audio/", func(w http.ResponseWriter, r *http.Request) {
