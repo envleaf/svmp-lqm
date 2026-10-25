@@ -749,27 +749,134 @@ document.addEventListener("DOMContentLoaded", function() {
     };
 
     let initialRestoreAttempted = false;
+    let pendingRestoreTime = null;
+    let lastSaveTime = 0;
+
+    function saveCurrentQueueState() {
+        if (!cm.state.options || cm.state.options.rememberLastQueue === false) return;
+        const activeTrack = pm.getActiveTrack();
+        if (!activeTrack) {
+            cm.saveQueueState(null);
+            return;
+        }
+
+        const qState = {
+            currentTrackPath: activeTrack.originalPath || null,
+            currentTime: audioEl.currentTime || 0,
+            manualQueuePaths: pm.manualQueue.map(idx => pm.playlist[idx]?.originalPath).filter(Boolean),
+            upcomingQueuePaths: pm.upcomingQueue.map(idx => pm.playlist[idx]?.originalPath).filter(Boolean),
+            historyPaths: pm.history.map(idx => pm.playlist[idx]?.originalPath).filter(Boolean),
+            activeIndicesPaths: pm.isCustomMode ? pm.activeIndices.map(idx => pm.playlist[idx]?.originalPath).filter(Boolean) : null,
+            isShuffle: pm.isShuffle,
+            isCustomMode: pm.isCustomMode,
+            activePlaylistName: pm.activePlaylistName
+        };
+
+        cm.saveQueueState(qState);
+    }
+
+    window.addEventListener('beforeunload', saveCurrentQueueState);
+    window.addEventListener('pagehide', saveCurrentQueueState);
 
     async function attemptRestoreLastQueuePosition() {
         if (initialRestoreAttempted) return;
-        initialRestoreAttempted = true;
-
         if (cm.state.firstRun !== false) return;
         if (cm.state.options && cm.state.options.rememberLastQueue === false) return;
-        if (!window.goGetPlaylistTracks) return;
+        if (pm.playlist.length === 0) return;
+
+        initialRestoreAttempted = true;
 
         try {
-            let recentsTracks = await window.goGetPlaylistTracks("recents");
-            if (recentsTracks && recentsTracks.length > 0) {
-                let lastTrack = recentsTracks[0];
-                let gIdx = pm.playlist.findIndex(t => t.originalPath === lastTrack.originalPath);
-                if (gIdx !== -1) {
-                    pm.playTrackByGlobalIndex(gIdx);
+            const qs = cm.state.queueState;
+            if (!qs || !qs.currentTrackPath) {
+                pm.resetQueueAndPosition();
+                loadTrack();
+                if (cm.state.options && cm.state.options.autoPlayAtStartup) {
+                    playAudio();
+                }
+                return;
+            }
+
+            let currentGIdx = pm.playlist.findIndex(t => t.originalPath === qs.currentTrackPath);
+            if (currentGIdx === -1) {
+                // Persistent track path not found in indexed playlist (directory unreachable or files deleted/changed)
+                cm.saveQueueState(null);
+                if (pm.playlist.length > 0) {
+                    pm.resetQueueAndPosition();
                     loadTrack();
                     if (cm.state.options && cm.state.options.autoPlayAtStartup) {
                         playAudio();
                     }
                 }
+                return;
+            }
+
+            // Restore activeIndices if custom queue mode was active
+            if (qs.isCustomMode && Array.isArray(qs.activeIndicesPaths) && qs.activeIndicesPaths.length > 0) {
+                let restoredActive = qs.activeIndicesPaths
+                    .map(p => pm.playlist.findIndex(t => t.originalPath === p))
+                    .filter(idx => idx !== -1);
+                if (restoredActive.length > 0) {
+                    pm.activeIndices = restoredActive;
+                    pm.isCustomMode = true;
+                    pm.activePlaylistName = qs.activePlaylistName || null;
+                }
+            } else {
+                pm.isCustomMode = false;
+                pm.activePlaylistName = null;
+            }
+
+            // Restore shuffle state
+            pm.isShuffle = !!qs.isShuffle;
+            if (shuffleBtn) {
+                shuffleBtn.innerText = pm.isShuffle ? ui.t('[shuffle (x)]') : ui.t('[shuffle ( )]');
+            }
+
+            // Restore current global index (setting this triggers rebuildUpcomingQueue)
+            pm.currentGlobalIdx = currentGIdx;
+
+            // Restore manual queue
+            if (Array.isArray(qs.manualQueuePaths)) {
+                let restoredManual = qs.manualQueuePaths
+                    .map(p => pm.playlist.findIndex(t => t.originalPath === p))
+                    .filter(idx => idx !== -1);
+                pm.manualQueue.length = 0;
+                pm.manualQueue.push(...restoredManual);
+            }
+
+            // Restore history
+            if (Array.isArray(qs.historyPaths)) {
+                let restoredHist = qs.historyPaths
+                    .map(p => pm.playlist.findIndex(t => t.originalPath === p))
+                    .filter(idx => idx !== -1);
+                pm.history.length = 0;
+                pm.history.push(...restoredHist);
+            }
+
+            // Restore upcoming queue
+            if (Array.isArray(qs.upcomingQueuePaths) && qs.upcomingQueuePaths.length > 0) {
+                let restoredUpcoming = qs.upcomingQueuePaths
+                    .map(p => pm.playlist.findIndex(t => t.originalPath === p))
+                    .filter(idx => idx !== -1);
+                if (restoredUpcoming.length > 0) {
+                    pm.upcomingQueue.length = 0;
+                    pm.upcomingQueue.push(...restoredUpcoming);
+                }
+            }
+
+            if (qs.currentTime > 0) {
+                pendingRestoreTime = qs.currentTime;
+            }
+
+            updateNowPlayingHeader();
+            loadTrack();
+            renderGlobalIndex();
+            renderCustomPlaylistIndex();
+            renderQueueIndex();
+            if (searchInput.value) executeSearch();
+
+            if (cm.state.options && cm.state.options.autoPlayAtStartup) {
+                playAudio();
             }
         } catch (err) {
             console.warn("Error restoring last queue position:", err);
@@ -780,7 +887,17 @@ document.addEventListener("DOMContentLoaded", function() {
         if (indexingModal) {
             indexingModal.style.display = 'none';
         }
-        attemptRestoreLastQueuePosition();
+        if (!initialRestoreAttempted && cm.state.firstRun === false) {
+            if (cm.state.options && cm.state.options.rememberLastQueue !== false) {
+                attemptRestoreLastQueuePosition();
+            } else if (pm.playlist.length > 0) {
+                pm.resetQueueAndPosition();
+                loadTrack();
+                if (cm.state.options && cm.state.options.autoPlayAtStartup) {
+                    playAudio();
+                }
+            }
+        }
     };
 
     if (indexingCancelBtn) {
@@ -839,12 +956,17 @@ document.addEventListener("DOMContentLoaded", function() {
         renderQueueIndex();
         if (searchInput.value) executeSearch();
 
-        if (wasEmpty) {
-            loadTrack();
-            if (!initialRestoreAttempted && cm.state.firstRun === false && cm.state.options && cm.state.options.rememberLastQueue !== false) {
-                attemptRestoreLastQueuePosition();
-            } else if (cm.state.options && cm.state.options.autoPlayAtStartup) {
-                playAudio();
+        if (wasEmpty && pm.playlist.length > 0) {
+            if (!initialRestoreAttempted && cm.state.firstRun === false) {
+                if (cm.state.options && cm.state.options.rememberLastQueue !== false) {
+                    attemptRestoreLastQueuePosition();
+                } else {
+                    pm.resetQueueAndPosition();
+                    loadTrack();
+                    if (cm.state.options && cm.state.options.autoPlayAtStartup) {
+                        playAudio();
+                    }
+                }
             }
         }
     };
@@ -876,6 +998,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     window.liveClearPlaylist = function() {
+        initialRestoreAttempted = false;
         pm.activeIndices = [];
         pm.playlist.length = 0;
         pm.activePlaylistName = null;
@@ -1162,6 +1285,7 @@ document.addEventListener("DOMContentLoaded", function() {
     function loadTrack() {
         clearInterval(marqueeInterval);
         let track = pm.getActiveTrack();
+        saveCurrentQueueState();
         if (track && cm.state.options && cm.state.options.trackNotif) {
             let notifStr = `${track.title}`;
             if (track.artist) notifStr = `${track.artist} - ${track.title}`;
@@ -1295,6 +1419,7 @@ document.addEventListener("DOMContentLoaded", function() {
         updateVisualizerDisplay();
         stopMarquee();
         if (window.goUpdateMprisStatus) window.goUpdateMprisStatus("Paused");
+        saveCurrentQueueState();
     }
 
     function nextTrack(isUserAction = false) {
@@ -1361,6 +1486,7 @@ document.addEventListener("DOMContentLoaded", function() {
             renderCustomPlaylistIndex();
             renderQueueIndex();
             if (searchInput.value) executeSearch();
+            saveCurrentQueueState();
         } else if (e.button === 0) { // Left click
             if (pm.activePlaylistName) {
                 pm.exitPlaylistQueue();
@@ -2033,6 +2159,7 @@ document.addEventListener("DOMContentLoaded", function() {
         pm.isShuffle = !pm.isShuffle;
         shuffleBtn.innerText = pm.isShuffle ? ui.t('[shuffle (x)]') : ui.t('[shuffle ( )]');
         renderQueueIndex();
+        saveCurrentQueueState();
     });
 
     favBtn.addEventListener('click', async e => {
@@ -2177,6 +2304,10 @@ document.addEventListener("DOMContentLoaded", function() {
     // Audio Events
     audioEl.addEventListener('loadedmetadata', () => {
         timeTotal.innerText = formatTime(audioEl.duration);
+        if (pendingRestoreTime !== null && audioEl.duration) {
+            audioEl.currentTime = Math.min(pendingRestoreTime, audioEl.duration);
+            pendingRestoreTime = null;
+        }
         let track = pm.getActiveTrack();
         if (track && audioEl.duration) {
             track.duration = audioEl.duration;
@@ -2200,6 +2331,12 @@ document.addEventListener("DOMContentLoaded", function() {
             timeCurrent.innerText = formatTime(audioEl.currentTime);
             updateLyricsScroll();
             if (window.goUpdateMprisPosition) window.goUpdateMprisPosition(audioEl.currentTime);
+
+            const now = Date.now();
+            if (now - lastSaveTime > 3000) {
+                lastSaveTime = now;
+                saveCurrentQueueState();
+            }
         }
     });
     audioEl.addEventListener('ended', () => {
@@ -2431,6 +2568,12 @@ document.addEventListener("DOMContentLoaded", function() {
                     if (window.updateTimebarDisplay) window.updateTimebarDisplay();
                 } else if (opt === 'fullscreen') {
                     syncFullscreenState(val);
+                } else if (opt === 'rememberLastQueue') {
+                    if (val === true) {
+                        saveCurrentQueueState();
+                    } else if (val === false) {
+                        cm.saveQueueState(null);
+                    }
                 }
             }
             updateOptionsUI();
