@@ -401,19 +401,62 @@ window.UIController = (function() {
         renderQueueIndex();
     }
 
+    function parseSearchQuery(rawQuery) {
+        let q = rawQuery.trim();
+        if (!q) return { title: '', artist: null, album: null };
+
+        const operandRegex = /(?:^|\s)(a:|b:)/gi;
+        let matches = [];
+        let match;
+        while ((match = operandRegex.exec(q)) !== null) {
+            let operand = match[1].toLowerCase();
+            let operandStart = match.index + (match[0].length - match[1].length);
+            matches.push({ operand: operand, start: operandStart, length: match[1].length });
+        }
+
+        if (matches.length === 0) {
+            return { title: q, artist: null, album: null };
+        }
+
+        let title = q.substring(0, matches[0].start).trim();
+        let artist = null;
+        let album = null;
+
+        for (let i = 0; i < matches.length; i++) {
+            let current = matches[i];
+            let valStart = current.start + current.length;
+            let valEnd = (i + 1 < matches.length) ? matches[i + 1].start : q.length;
+            let val = q.substring(valStart, valEnd).trim();
+
+            if (current.operand === 'a:') {
+                artist = val;
+            } else if (current.operand === 'b:') {
+                album = val;
+            }
+        }
+
+        return { title, artist, album };
+    }
+
     function executeSearch() {
         const searchInput = document.getElementById('search-input');
         const searchResults = document.getElementById('search-results');
         const searchQueueAllBtn = document.getElementById('search-queue-all');
         if (!searchInput || !searchResults) return;
 
-        let query = searchInput.value.toLowerCase().trim();
-        if (!query) {
+        let rawQuery = searchInput.value.trim();
+        if (!rawQuery) {
             searchResults.innerHTML = '';
             matchingSearchResults = [];
             if (searchQueueAllBtn) searchQueueAllBtn.style.display = 'none';
             return;
         }
+
+        const parsed = parseSearchQuery(rawQuery);
+        let titleQ = parsed.title.toLowerCase();
+        let artistQ = parsed.artist !== null ? parsed.artist.toLowerCase() : null;
+        let albumQ = parsed.album !== null ? parsed.album.toLowerCase() : null;
+
         let html = '';
         let count = 0;
         matchingSearchResults = [];
@@ -423,22 +466,55 @@ window.UIController = (function() {
 
         activeIndices.forEach((globalIdx, localIdx) => {
             let track = playlist[globalIdx];
-            if (track.title.toLowerCase().includes(query)) {
-                matchingSearchResults.push(globalIdx);
-                let num = String(localIdx + 1).padStart(2, '0');
+
+            // Artist filter check
+            if (artistQ !== null) {
+                if (!track.artist || track.artist.trim() === '' || track.artist.trim().toLowerCase() === 'unknown') {
+                    return;
+                }
+                if (!track.artist.toLowerCase().includes(artistQ)) {
+                    return;
+                }
+            }
+
+            // Album filter check
+            if (albumQ !== null) {
+                if (!track.album || track.album.trim() === '' || track.album.trim().toLowerCase() === 'unknown') {
+                    return;
+                }
+                if (!track.album.toLowerCase().includes(albumQ)) {
+                    return;
+                }
+            }
+
+            // Title filter check
+            if (titleQ.length > 0) {
+                if (!track.title.toLowerCase().includes(titleQ)) {
+                    return;
+                }
+            }
+
+            matchingSearchResults.push(globalIdx);
+            let num = String(localIdx + 1).padStart(2, '0');
+            let qPrefix = getQueuePrefix(globalIdx);
+
+            let highlightedTitle;
+            if (titleQ.length > 0) {
                 let titleLower = track.title.toLowerCase();
-                let matchStart = titleLower.indexOf(query);
-                let matchEnd = matchStart + query.length;
+                let matchStart = titleLower.indexOf(titleQ);
+                let matchEnd = matchStart + titleQ.length;
 
                 let beforeMatch = track.title.substring(0, matchStart);
                 let matchText = track.title.substring(matchStart, matchEnd);
                 let afterMatch = track.title.substring(matchEnd);
-                let qPrefix = getQueuePrefix(globalIdx);
 
-                let highlightedTitle = `${ui.t(qPrefix)}${ui.t(beforeMatch)}<span style="background-color: var(--text-color); color: var(--bg-color);">${ui.t(matchText)}</span>${ui.t(afterMatch)}`;
-                html += `<div style="display: flex;"><a href="#" class="info-btn" data-idx="${globalIdx}" style="text-decoration: none; margin-right: 5px;">[i]</a><a href="#" class="search-result-link track-link" data-idx="${globalIdx}" style="display: block; text-decoration: none; flex-grow: 1;">| ${num}. ${highlightedTitle}</a></div>`;
-                count++;
+                highlightedTitle = `${ui.t(qPrefix)}${ui.t(beforeMatch)}<span style="background-color: var(--text-color); color: var(--bg-color);">${ui.t(matchText)}</span>${ui.t(afterMatch)}`;
+            } else {
+                highlightedTitle = `${ui.t(qPrefix)}${ui.t(track.title)}`;
             }
+
+            html += `<div style="display: flex;"><a href="#" class="info-btn" data-idx="${globalIdx}" style="text-decoration: none; margin-right: 5px;">[i]</a><a href="#" class="search-result-link track-link" data-idx="${globalIdx}" style="display: block; text-decoration: none; flex-grow: 1;">| ${num}. ${highlightedTitle}</a></div>`;
+            count++;
         });
 
         if (count === 0) {
