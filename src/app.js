@@ -2577,6 +2577,8 @@ document.addEventListener("DOMContentLoaded", function() {
     // Global Close / Esc Helper
     function closeAllModalsAndMenus() {
         document.getElementById('keybind-modal').style.display = 'none';
+        const patchNotesModal = document.getElementById('patch-notes-modal');
+        if (patchNotesModal) patchNotesModal.style.display = 'none';
         document.getElementById('welcome-modal').style.display = 'none';
         document.getElementById('song-info-modal').style.display = 'none';
         document.getElementById('dir-browser-modal').style.display = 'none';
@@ -2851,6 +2853,35 @@ document.addEventListener("DOMContentLoaded", function() {
             }
             scheduleHintNotification();
         }, getRandomInterval(5, 15));
+    }
+
+    // Version check & patch notes notification
+    const CURRENT_VERSION = "0.0.63";
+    const lastSeenVer = localStorage.getItem('svmp_last_seen_version');
+    if (lastSeenVer === null) {
+        localStorage.setItem('svmp_last_seen_version', CURRENT_VERSION);
+    } else if (lastSeenVer !== CURRENT_VERSION) {
+        localStorage.setItem('svmp_last_seen_version', CURRENT_VERSION);
+        setTimeout(() => {
+            if (ui && ui.showNotification) {
+                ui.showNotification(`SvMP has been updated to ${CURRENT_VERSION}-LQM. Click to see changes.`, () => {
+                    closeAllModalsAndMenus();
+                    const pModal = document.getElementById('patch-notes-modal');
+                    if (pModal) pModal.style.display = 'block';
+                });
+            }
+        }, 1000);
+    }
+
+    const versionLink = document.getElementById('version-patch-link');
+    if (versionLink) {
+        versionLink.addEventListener('click', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeAllModalsAndMenus();
+            const pModal = document.getElementById('patch-notes-modal');
+            if (pModal) pModal.style.display = 'block';
+        });
     }
 
     // Trigger default greeting notification

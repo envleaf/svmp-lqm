@@ -39,7 +39,7 @@ window.UIManager = (function() {
         return applyTextFilters(str);
     }
 
-    function showNotification(message) {
+    function showNotification(message, onClick) {
         let cm = window.ConfigManager;
         if (cm.state.options && cm.state.options.notifications === false) return;
 
@@ -48,7 +48,17 @@ window.UIManager = (function() {
 
         const notif = document.createElement('div');
         notif.className = 'notification-item';
+        if (onClick) {
+            notif.style.cursor = 'pointer';
+        }
         notif.innerText = t(message);
+
+        if (onClick) {
+            notif.addEventListener('click', (e) => {
+                onClick(e);
+                notif.remove();
+            });
+        }
 
         notif.addEventListener('contextmenu', (e) => {
             e.preventDefault();

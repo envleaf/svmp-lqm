@@ -21,7 +21,7 @@ The following features are critical and MUST NOT be broken, altered, or removed 
 ## Versioning Instructions for Agents
 
 <!-- AGENT VERSIONING COMMENT
-Current Version: 0.0.62
+Current Version: 0.0.63
 Current Branch Tag: nightly-lqm
 
 Rules for Updating Versioning:
@@ -33,4 +33,5 @@ Rules for Updating Versioning:
 5. Note: The source repo being pulled from is envleaf/svmp, NOT envleaf/svmp-lqm.
 6. Always reflect version and branch tag updates in player.html inside the keybind modal:
    Format: svmp-lqm <VERSION> (<BRANCH-TAG>)
+7. For every commit, update the patch notes modal (#patch-notes-modal) in src/player.html with a brief description of what changed in the new version along with the short git commit ID.
 -->
