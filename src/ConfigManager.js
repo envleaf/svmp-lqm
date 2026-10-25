@@ -9,7 +9,7 @@ window.ConfigManager = (function() {
         visualizer: true,
         charOverride: null,
         isUwu: false,
-        options: { notifications: true, trackNotif: true, hintsNotif: true, notifDuration: 5000, marqueeSpeed: 'normal', notifPosition: 'tl', expie: false, timebar: true, fullscreen: false },
+        options: { notifications: true, trackNotif: true, hintsNotif: true, notifDuration: 5000, marqueeSpeed: 'normal', notifPosition: 'tl', expie: false, timebar: true, fullscreen: false, autoPlayAtStartup: false },
         nativeDir: "",
         firstRun: true
     };

@@ -783,7 +783,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
             if (wasEmpty) {
                 loadTrack();
-                playAudio();
+                if (cm.state.options && cm.state.options.autoPlayAtStartup) {
+                    playAudio();
+                }
             }
         });
     };
@@ -810,7 +812,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
         if (wasEmpty) {
             loadTrack();
-            playAudio();
+            if (cm.state.options && cm.state.options.autoPlayAtStartup) {
+                playAudio();
+            }
         }
     };
 
@@ -2131,6 +2135,22 @@ document.addEventListener("DOMContentLoaded", function() {
     // Audio Events
     audioEl.addEventListener('loadedmetadata', () => {
         timeTotal.innerText = formatTime(audioEl.duration);
+        let track = pm.getActiveTrack();
+        if (track && audioEl.duration) {
+            track.duration = audioEl.duration;
+            ae.fetchLyrics(
+                track.title,
+                () => {},
+                (plain, isSynced = true) => {
+                    if (isSynced) lyricsContent.innerHTML = ui.t("synced lyrics loaded.\nplay track to scroll.");
+                    else lyricsContent.innerText = ui.t(`+-- plain lyrics --------------+\n\n${plain}\n\n+------------------------------+`);
+                },
+                () => {},
+                () => {},
+                track.artist || '',
+                audioEl.duration
+            );
+        }
     });
     audioEl.addEventListener('timeupdate', () => {
         if (audioEl.duration) {
