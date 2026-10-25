@@ -577,6 +577,7 @@
 <pre style="margin: 0;">+-- track search -----------------------+</pre>
     <div style="display: flex; align-items: center; gap: 10px; margin-top: 0.5em; margin-bottom: 10px;">
         <input type="text" id="search-input" placeholder="search active queue..." spellcheck="false" autocomplete="off" style="margin-bottom: 0; flex-grow: 1;">
+        <a href="#" id="search-clear" style="display: none; white-space: nowrap; text-decoration: none;">[ clear ]</a>
         <a href="#" id="search-queue-all" style="display: none; white-space: nowrap; text-decoration: none;">[ queue all ]</a>
     </div>
     <div id="search-results" style="margin-top: 0.5em; margin-bottom: 0; line-height: 1.8;"></div>
@@ -781,10 +782,13 @@
     </div>
 </div>
 <div style="display: flex; gap: 15px; flex-wrap: wrap; color: var(--text-color);">
-    <a href="#" id="song-info-play">[play]</a>
     <a href="#" id="song-info-queue">[add to queue]</a>
-    <a href="#" id="song-info-play-album" style="display: none;">[play from album]</a>
+    <a href="#" id="song-info-play-from">[Play From...]</a>
     <a href="#" id="song-info-play-artist" style="display: none;">[play from artist]</a>
+    <a href="#" id="song-info-play-album" style="display: none;">[play from album]</a>
+    <a href="#" id="song-info-go-to">[Go To...]</a>
+    <a href="#" id="song-info-goto-artist" style="display: none;">[go to artist]</a>
+    <a href="#" id="song-info-goto-album" style="display: none;">[go to album]</a>
     <a href="#" id="song-info-add-list">[add to list]</a>
     <a href="#" id="song-info-remove" style="color: #ff5555;">[remove]</a>
     <a href="#" id="song-info-close">[close]</a>

@@ -134,6 +134,7 @@ window.ListsManager = (function() {
             let line = `| ${num}. ${displayTitle}`;
 
             html += `<div style="display: flex;">`;
+            html += `<a href="#" class="pl-info-btn" data-idx="${i}" style="text-decoration: none; margin-right: 5px;">[i]</a>`;
             if (currentViewingPlaylist !== "recents") {
                 html += `<a href="#" class="del-track-btn" data-path="${encodeURIComponent(track.originalPath)}" style="color: #ff5555; text-decoration: none; margin-right: 5px;">[x]</a>`;
             }
@@ -141,6 +142,23 @@ window.ListsManager = (function() {
         });
 
         els.listsModalContent.innerHTML = html;
+
+        document.querySelectorAll('.pl-info-btn').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.preventDefault();
+                let i = parseInt(btn.getAttribute('data-idx'), 10);
+                let track = listTracks[i];
+                if (!track) return;
+                let globalIdx = pm.playlist.findIndex(t => t.originalPath === track.originalPath);
+                if (globalIdx === -1) {
+                    pm.playlist.push(track);
+                    globalIdx = pm.playlist.length - 1;
+                }
+                if (window.UIController && window.UIController.openInfoModal) {
+                    window.UIController.openInfoModal(globalIdx);
+                }
+            });
+        });
 
         document.querySelectorAll('.del-track-btn').forEach(btn => {
             btn.addEventListener('click', async e => {
