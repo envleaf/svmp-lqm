@@ -177,94 +177,121 @@ window.AudioEngine = (function() {
             if (requestId !== currentFetchRequestId) return;
 
             try {
-                let searchQuery = targetTitle;
-                if (artistName && artistName.toLowerCase() !== 'unknown') {
-                    searchQuery = `${artistName} ${targetTitle}`;
+                let bestCandidate = null;
+
+                // Attempt exact /api/get if artist and duration are available
+                if (trackDuration > 0) {
+                    try {
+                        let getUrl = `https://lrclib.net/api/get?track_name=${encodeURIComponent(targetTitle)}&duration=${Math.round(trackDuration)}`;
+                        if (artistName && artistName.toLowerCase() !== 'unknown') {
+                            getUrl += `&artist_name=${encodeURIComponent(artistName)}`;
+                        }
+                        let getResp = await fetch(getUrl);
+                        if (getResp.ok) {
+                            let getItem = await getResp.json();
+                            if (getItem && (getItem.syncedLyrics || getItem.plainLyrics)) {
+                                bestCandidate = getItem;
+                            }
+                        }
+                    } catch (e) {
+                        // ignore and fallback to search
+                    }
                 }
 
-                let query = encodeURIComponent(searchQuery);
-                let response = await fetch(`https://lrclib.net/api/search?q=${query}`);
-                let data = await response.json();
+                if (!bestCandidate) {
+                    let searchQuery = targetTitle;
+                    if (artistName && artistName.toLowerCase() !== 'unknown') {
+                        searchQuery = `${artistName} ${targetTitle}`;
+                    }
+
+                    let query = encodeURIComponent(searchQuery);
+                    let response = await fetch(`https://lrclib.net/api/search?q=${query}`);
+                    let data = await response.json();
+
+                    if (requestId !== currentFetchRequestId) return;
+
+                    if (data && Array.isArray(data) && data.length > 0) {
+                        // Score candidates using fuzzy matching
+                        let bestScore = -1;
+
+                        for (let item of data) {
+                            let score = 0;
+                            const itemTitle = item.trackName || item.name || '';
+                            const itemArtist = item.artistName || '';
+
+                            const titleSim = calculateSimilarity(targetTitle, itemTitle);
+                            score += titleSim * 40;
+
+                            if (artistName && artistName.toLowerCase() !== 'unknown') {
+                                const artistSim = calculateSimilarity(artistName, itemArtist);
+                                score += artistSim * 30;
+                            } else {
+                                score += 15;
+                            }
+
+                            if (trackDuration > 0 && item.duration > 0) {
+                                const diff = Math.abs(trackDuration - item.duration);
+                                if (diff <= 3) score += 30;
+                                else if (diff <= 8) score += 20;
+                                else if (diff <= 15) score += 10;
+                                else if (diff <= 30) score += 0;
+                                else score -= 40; // Penalize wrong duration edits/versions
+                            }
+
+                            if (item.syncedLyrics && item.syncedLyrics.trim().length > 0) {
+                                score += 25;
+                            } else if (item.plainLyrics && item.plainLyrics.trim().length > 0) {
+                                score += 10;
+                            }
+
+                            if (score > bestScore) {
+                                bestScore = score;
+                                bestCandidate = item;
+                            }
+                        }
+
+                        if (bestScore < 25) {
+                            bestCandidate = null;
+                        }
+                    }
+                }
 
                 if (requestId !== currentFetchRequestId) return;
 
-                if (data && Array.isArray(data) && data.length > 0) {
-                    // Score candidates using fuzzy matching
-                    let bestCandidate = null;
-                    let bestScore = -1;
+                if (bestCandidate) {
+                    if (bestCandidate.syncedLyrics && bestCandidate.syncedLyrics.trim().length > 0) {
+                        let lines = bestCandidate.syncedLyrics.split('\n');
+                        let parsed = [];
 
-                    for (let item of data) {
-                        let score = 0;
-                        const itemTitle = item.trackName || item.name || '';
-                        const itemArtist = item.artistName || '';
+                        for (let line of lines) {
+                            line = line.trim();
+                            if (!line) continue;
 
-                        const titleSim = calculateSimilarity(targetTitle, itemTitle);
-                        score += titleSim * 40;
+                            let timestampRegex = /\[(\d{1,2}):(\d{2})[.:](\d{1,3})\]/g;
+                            let matches = [...line.matchAll(timestampRegex)];
+                            if (matches.length === 0) continue;
 
-                        if (artistName && artistName.toLowerCase() !== 'unknown') {
-                            const artistSim = calculateSimilarity(artistName, itemArtist);
-                            score += artistSim * 30;
-                        } else {
-                            score += 15;
-                        }
+                            let text = line.replace(/\[\d{1,2}:\d{2}[.:]\d{1,3}\]/g, '').trim() || '♪';
 
-                        if (trackDuration > 0 && item.duration > 0) {
-                            const diff = Math.abs(trackDuration - item.duration);
-                            if (diff <= 3) score += 20;
-                            else if (diff <= 8) score += 15;
-                            else if (diff <= 15) score += 10;
-                            else if (diff <= 30) score += 5;
-                        }
-
-                        if (item.syncedLyrics && item.syncedLyrics.trim().length > 0) {
-                            score += 25;
-                        } else if (item.plainLyrics && item.plainLyrics.trim().length > 0) {
-                            score += 10;
-                        }
-
-                        if (score > bestScore) {
-                            bestScore = score;
-                            bestCandidate = item;
-                        }
-                    }
-
-                    if (bestCandidate && bestScore >= 25) {
-                        if (bestCandidate.syncedLyrics && bestCandidate.syncedLyrics.trim().length > 0) {
-                            let lines = bestCandidate.syncedLyrics.split('\n');
-                            let parsed = [];
-
-                            for (let line of lines) {
-                                line = line.trim();
-                                if (!line) continue;
-
-                                let timestampRegex = /\[(\d{1,2}):(\d{2})[.:](\d{1,3})\]/g;
-                                let matches = [...line.matchAll(timestampRegex)];
-                                if (matches.length === 0) continue;
-
-                                let text = line.replace(/\[\d{1,2}:\d{2}[.:]\d{1,3}\]/g, '').trim() || '♪';
-
-                                for (let match of matches) {
-                                    let m = parseInt(match[1], 10);
-                                    let s = parseInt(match[2], 10);
-                                    let fractionStr = match[3];
-                                    let fraction = parseFloat("0." + fractionStr);
-                                    let time = (m * 60) + s + (isNaN(fraction) ? 0 : fraction);
-                                    parsed.push({ time, text });
-                                }
+                            for (let match of matches) {
+                                let m = parseInt(match[1], 10);
+                                let s = parseInt(match[2], 10);
+                                let fractionStr = match[3];
+                                let fraction = parseFloat("0." + fractionStr);
+                                let time = (m * 60) + s + (isNaN(fraction) ? 0 : fraction);
+                                parsed.push({ time, text });
                             }
+                        }
 
-                            parsed.sort((a, b) => a.time - b.time);
-                            currentParsedLyrics = parsed;
+                        parsed.sort((a, b) => a.time - b.time);
+                        currentParsedLyrics = parsed;
 
-                            if (requestId === currentFetchRequestId) {
-                                onSuccess(null, true);
-                            }
-                        } else if (bestCandidate.plainLyrics && bestCandidate.plainLyrics.trim().length > 0) {
-                            if (requestId === currentFetchRequestId) {
-                                onSuccess(bestCandidate.plainLyrics, false);
-                            }
-                        } else {
-                            if (requestId === currentFetchRequestId) onEmpty();
+                        if (requestId === currentFetchRequestId) {
+                            onSuccess(null, true);
+                        }
+                    } else if (bestCandidate.plainLyrics && bestCandidate.plainLyrics.trim().length > 0) {
+                        if (requestId === currentFetchRequestId) {
+                            onSuccess(bestCandidate.plainLyrics, false);
                         }
                     } else {
                         if (requestId === currentFetchRequestId) onEmpty();

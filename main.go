@@ -340,6 +340,7 @@ func loadConfig() AppConfig {
 				"notifications": true, "trackNotif": true, "hintsNotif": true,
 				"notifDuration": 5000, "marqueeSpeed": "normal", "notifPosition": "tl",
 				"expie": false, "timebar": true, "fullscreen": false,
+				"autoPlayAtStartup": false,
 			},
 			"nativeDir": "",
 		}
