@@ -348,8 +348,6 @@ window.UIController = (function() {
                 let num = String(i + 1).padStart(2, '0');
                 let titleStr = getQueuePrefix(globalIdx) + track.title;
                 let line = `| ${num}. ${titleStr}`;
-                if (line.length > 39) line = line.substring(0, 36) + "...";
-                line = line.padEnd(40, " ") + "|";
                 html += `<div style="display: flex;"><a href="#" class="info-btn" data-idx="${globalIdx}" style="text-decoration: none; margin-right: 5px;">[i]</a><a href="#" class="track-link" data-idx="${globalIdx}" style="display: block; text-decoration: none; flex-grow: 1;">${ui.t(line)}</a></div>`;
             });
             html += ui.t("+---------------------------------------+");

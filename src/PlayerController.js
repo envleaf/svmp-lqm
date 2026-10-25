@@ -31,12 +31,7 @@ window.PlayerController = (function() {
         let trackNumDisplay = pm.currentIndex + 1;
         let totalDisplay = pm.activeIndices.length;
 
-        let displayStr = fullTitleString.substring(0, 30);
-        if (fullTitleString.length > 30) {
-            displayStr += "...";
-        } else {
-            displayStr = fullTitleString;
-        }
+        let displayStr = fullTitleString;
 
         trackTitleDisplay.innerHTML = `${ui.t(displayStr)} <span style="color: var(--prompt-color); font-size: 0.9em;">[${trackNumDisplay}/${totalDisplay}]</span>`;
     }
