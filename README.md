@@ -21,6 +21,7 @@ i dont know
 - Playlists are .txt files stored in /playlists, with relative paths to each music file (this makes them portable, kind of, but also easy to manage)
 - The UI is unique (up to you if thats a good or bad thing)
 - This overcomplicated .mp3 player has both frameworks for notifications and commands.
+- app.js is fucking massive
 
 ### Screenshots
 Main Screen
