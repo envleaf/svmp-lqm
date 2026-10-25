@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net"
@@ -442,8 +443,8 @@ func main() {
 		updateMprisStatus(status)
 	})
 
-	w.Bind("goUpdateMprisMetadata", func(title, artist, path string) {
-		updateMprisMetadata(title, artist, path)
+	w.Bind("goUpdateMprisMetadata", func(title, artist, path, artUrl string) {
+		updateMprisMetadata(title, artist, path, artUrl)
 	})
 
 	w.Bind("goUpdateMprisPosition", func(seconds float64) {
@@ -540,38 +541,38 @@ func startServer(listener net.Listener) {
 
 	http.HandleFunc("/art", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Query().Get("path")
-		if path == "" {
-			http.Error(w, "Missing path", http.StatusBadRequest)
-			return
+		artUrlParam := r.URL.Query().Get("url")
+
+		if path != "" {
+			cleanPath := filepath.Clean(path)
+			if selectedMusicDir != "" && strings.HasPrefix(filepath.ToSlash(cleanPath), filepath.ToSlash(selectedMusicDir)) {
+				f, err := os.Open(path)
+				if err == nil {
+					defer f.Close()
+					m, err := tag.ReadFrom(f)
+					if err == nil && m != nil {
+						pic := m.Picture()
+						if pic != nil {
+							w.Header().Set("Content-Type", pic.MIMEType)
+							w.Write(pic.Data)
+							return
+						}
+					}
+				}
+			}
 		}
 
-		cleanPath := filepath.Clean(path)
-		if selectedMusicDir == "" || !strings.HasPrefix(filepath.ToSlash(cleanPath), filepath.ToSlash(selectedMusicDir)) {
-			http.Error(w, "Access Denied", http.StatusForbidden)
-			return
+		if artUrlParam != "" {
+			resp, err := http.Get(artUrlParam)
+			if err == nil && resp.StatusCode == http.StatusOK {
+				defer resp.Body.Close()
+				w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+				_, _ = io.Copy(w, resp.Body)
+				return
+			}
 		}
 
-		f, err := os.Open(path)
-		if err != nil {
-			http.Error(w, "File not found", http.StatusNotFound)
-			return
-		}
-		defer f.Close()
-
-		m, err := tag.ReadFrom(f)
-		if err != nil {
-			http.Error(w, "No tags", http.StatusNotFound)
-			return
-		}
-
-		pic := m.Picture()
-		if pic == nil {
-			http.Error(w, "No artwork", http.StatusNotFound)
-			return
-		}
-
-		w.Header().Set("Content-Type", pic.MIMEType)
-		w.Write(pic.Data)
+		http.Error(w, "No artwork", http.StatusNotFound)
 	})
 
 	log.Println("Starting server on", listener.Addr().String())

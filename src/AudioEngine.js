@@ -11,6 +11,27 @@ window.AudioEngine = (function() {
 
     // Lyrics state
     let currentParsedLyrics = [];
+    let lyricsTimeoutId = null;
+    let currentFetchRequestId = 0;
+
+    function calculateSimilarity(str1, str2) {
+        if (!str1 || !str2) return 0;
+        const s1 = String(str1).toLowerCase().replace(/[^\w\s]/gi, '').trim();
+        const s2 = String(str2).toLowerCase().replace(/[^\w\s]/gi, '').trim();
+        if (s1 === s2) return 1.0;
+        if (s1.includes(s2) || s2.includes(s1)) return 0.8;
+
+        const words1 = new Set(s1.split(/\s+/).filter(w => w.length > 0));
+        const words2 = new Set(s2.split(/\s+/).filter(w => w.length > 0));
+        if (words1.size === 0 || words2.size === 0) return 0;
+
+        let intersection = 0;
+        for (let w of words1) {
+            if (words2.has(w)) intersection++;
+        }
+        const union = new Set([...words1, ...words2]).size;
+        return union > 0 ? intersection / union : 0;
+    }
 
     function init(audioElement) {
         audio = audioElement;
@@ -132,38 +153,129 @@ window.AudioEngine = (function() {
     }
     function getMuted() { return isMuted; }
 
-    async function fetchLyrics(trackName, onStart, onSuccess, onFail, onEmpty) {
-        onStart(trackName);
-        currentParsedLyrics = [];
-        try {
-            let query = encodeURIComponent(trackName);
-            let response = await fetch(`https://lrclib.net/api/search?q=${query}`);
-            let data = await response.json();
-
-            if (data && data.length > 0) {
-                if (data[0].syncedLyrics) {
-                    currentParsedLyrics = data[0].syncedLyrics.split('\n').map(line => {
-                        let match = line.match(/\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/);
-                        if(match) {
-                            let m = parseInt(match[1], 10);
-                            let s = parseInt(match[2], 10);
-                            let ms = parseInt(match[3], 10) / (match[3].length === 3 ? 1000 : 100);
-                            return { time: (m * 60) + s + ms, text: match[4].trim() || '♪' };
-                        }
-                        return null;
-                    }).filter(l => l);
-                    onSuccess();
-                } else if (data[0].plainLyrics) {
-                    onSuccess(data[0].plainLyrics, false);
-                } else {
-                    onEmpty();
-                }
-            } else {
-                onEmpty();
-            }
-        } catch (err) {
-            onFail();
+    async function fetchLyrics(trackName, onStart, onSuccess, onFail, onEmpty, artistName = '', trackDuration = 0) {
+        if (lyricsTimeoutId) {
+            clearTimeout(lyricsTimeoutId);
+            lyricsTimeoutId = null;
         }
+
+        currentFetchRequestId++;
+        const requestId = currentFetchRequestId;
+        currentParsedLyrics = [];
+
+        let targetTitle = trackName;
+        if (typeof trackName === 'object' && trackName !== null) {
+            targetTitle = trackName.title || '';
+            artistName = trackName.artist || artistName;
+            trackDuration = trackName.duration || trackDuration;
+        }
+
+        onStart(targetTitle);
+
+        // 2.5 second debounce delay to prevent fetching lyrics for skipped songs
+        lyricsTimeoutId = setTimeout(async () => {
+            if (requestId !== currentFetchRequestId) return;
+
+            try {
+                let searchQuery = targetTitle;
+                if (artistName && artistName.toLowerCase() !== 'unknown') {
+                    searchQuery = `${artistName} ${targetTitle}`;
+                }
+
+                let query = encodeURIComponent(searchQuery);
+                let response = await fetch(`https://lrclib.net/api/search?q=${query}`);
+                let data = await response.json();
+
+                if (requestId !== currentFetchRequestId) return;
+
+                if (data && Array.isArray(data) && data.length > 0) {
+                    // Score candidates using fuzzy matching
+                    let bestCandidate = null;
+                    let bestScore = -1;
+
+                    for (let item of data) {
+                        let score = 0;
+                        const itemTitle = item.trackName || item.name || '';
+                        const itemArtist = item.artistName || '';
+
+                        const titleSim = calculateSimilarity(targetTitle, itemTitle);
+                        score += titleSim * 40;
+
+                        if (artistName && artistName.toLowerCase() !== 'unknown') {
+                            const artistSim = calculateSimilarity(artistName, itemArtist);
+                            score += artistSim * 30;
+                        } else {
+                            score += 15;
+                        }
+
+                        if (trackDuration > 0 && item.duration > 0) {
+                            const diff = Math.abs(trackDuration - item.duration);
+                            if (diff <= 3) score += 20;
+                            else if (diff <= 8) score += 15;
+                            else if (diff <= 15) score += 10;
+                            else if (diff <= 30) score += 5;
+                        }
+
+                        if (item.syncedLyrics && item.syncedLyrics.trim().length > 0) {
+                            score += 25;
+                        } else if (item.plainLyrics && item.plainLyrics.trim().length > 0) {
+                            score += 10;
+                        }
+
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestCandidate = item;
+                        }
+                    }
+
+                    if (bestCandidate && bestScore >= 25) {
+                        if (bestCandidate.syncedLyrics && bestCandidate.syncedLyrics.trim().length > 0) {
+                            let lines = bestCandidate.syncedLyrics.split('\n');
+                            let parsed = [];
+
+                            for (let line of lines) {
+                                line = line.trim();
+                                if (!line) continue;
+
+                                let timestampRegex = /\[(\d{1,2}):(\d{2})[.:](\d{1,3})\]/g;
+                                let matches = [...line.matchAll(timestampRegex)];
+                                if (matches.length === 0) continue;
+
+                                let text = line.replace(/\[\d{1,2}:\d{2}[.:]\d{1,3}\]/g, '').trim() || '♪';
+
+                                for (let match of matches) {
+                                    let m = parseInt(match[1], 10);
+                                    let s = parseInt(match[2], 10);
+                                    let fractionStr = match[3];
+                                    let fraction = parseFloat("0." + fractionStr);
+                                    let time = (m * 60) + s + (isNaN(fraction) ? 0 : fraction);
+                                    parsed.push({ time, text });
+                                }
+                            }
+
+                            parsed.sort((a, b) => a.time - b.time);
+                            currentParsedLyrics = parsed;
+
+                            if (requestId === currentFetchRequestId) {
+                                onSuccess(null, true);
+                            }
+                        } else if (bestCandidate.plainLyrics && bestCandidate.plainLyrics.trim().length > 0) {
+                            if (requestId === currentFetchRequestId) {
+                                onSuccess(bestCandidate.plainLyrics, false);
+                            }
+                        } else {
+                            if (requestId === currentFetchRequestId) onEmpty();
+                        }
+                    } else {
+                        if (requestId === currentFetchRequestId) onEmpty();
+                    }
+                } else {
+                    if (requestId === currentFetchRequestId) onEmpty();
+                }
+            } catch (err) {
+                if (requestId === currentFetchRequestId) onFail();
+            }
+        }, 2500);
     }
 
     function getParsedLyrics() {
