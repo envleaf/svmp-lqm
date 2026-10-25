@@ -362,8 +362,22 @@ func loadConfig() AppConfig {
 		if err := yaml.Unmarshal(data, &config); err != nil {
 			log.Println("Error parsing svmp-lqm.conf:", err)
 		}
+		modified := false
 		if _, exists := config["playlists"]; exists {
 			delete(config, "playlists")
+			modified = true
+		}
+		if _, exists := config["queueState"]; exists {
+			delete(config, "queueState")
+			modified = true
+		}
+		if opts, ok := config["options"].(map[string]interface{}); ok {
+			if _, exists := opts["rememberLastQueue"]; exists {
+				delete(opts, "rememberLastQueue")
+				modified = true
+			}
+		}
+		if modified {
 			saveConfig(config)
 		}
 	} else if os.IsNotExist(err) {
@@ -388,7 +402,7 @@ func loadConfig() AppConfig {
 				"notifications": true, "trackNotif": true, "hintsNotif": true,
 				"notifDuration": 5000, "marqueeSpeed": "normal", "notifPosition": "tl",
 				"expie": false, "timebar": true, "fullscreen": false,
-				"autoPlayAtStartup": false, "rememberLastQueue": true,
+				"autoPlayAtStartup": false,
 			},
 			"nativeDir": "",
 		}

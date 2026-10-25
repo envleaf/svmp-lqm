@@ -486,19 +486,19 @@
 |  [Esc]     close all menus/modals     |
 |  [/]       toggle this menu           |
 |                                       |
-|  <a href="#" id="version-patch-link" style="text-decoration: none;">svmp-lqm v68-nightly</a>               |
+|  <a href="#" id="version-patch-link" style="text-decoration: none;">svmp-lqm v69-nightly</a>               |
 +---------------------------------------+</pre>
 </div>
 
 <div id="patch-notes-modal" class="overlay-modal focus-hide">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0; color: var(--text-color);">
-+-- patch notes (v68-nightly) -----------+
-|  commit: TBD                          |
++-- patch notes (v69-nightly) -----------+
+|  commit: 74b47ac                      |
 |                                       |
-|  - Added advanced search filters      |
-|    for artist (a:) and album (b:)     |
-|    operands in search input.          |
+|  - Removed "remember last queue"      |
+|    logic and settings toggle to       |
+|    prevent bloated config files.      |
 |                                       |
 +---------------------------------------+</pre>
 </div>
@@ -733,12 +733,6 @@
             <div>
                 <a href="#" class="opt-toggle" data-opt="autoPlayAtStartup" data-val="true">[ ] on</a>
                 <a href="#" class="opt-toggle" data-opt="autoPlayAtStartup" data-val="false">[x] off</a>
-            </div>
-
-            <strong style="color: var(--text-color); margin-top: 10px;">remember last queue</strong>
-            <div>
-                <a href="#" class="opt-toggle" data-opt="rememberLastQueue" data-val="true">[x] on</a>
-                <a href="#" class="opt-toggle" data-opt="rememberLastQueue" data-val="false">[ ] off</a>
             </div>
 
             <!-- ALWAYS KEEP AT BOTTOM OF THIRD COLUMN -->

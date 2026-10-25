@@ -136,128 +136,14 @@ document.addEventListener("DOMContentLoaded", function() {
     };
 
     let initialRestoreAttempted = false;
-    let pendingRestoreTime = null;
-    let lastSaveTime = 0;
-
-    window.addEventListener('beforeunload', () => {
-        if (window.PlayerController) window.PlayerController.saveCurrentQueueState();
-    });
-    window.addEventListener('pagehide', () => {
-        if (window.PlayerController) window.PlayerController.saveCurrentQueueState();
-    });
-
-    async function attemptRestoreLastQueuePosition() {
-        if (initialRestoreAttempted) return;
-        if (cm.state.firstRun !== false) return;
-        if (cm.state.options && cm.state.options.rememberLastQueue === false) return;
-        if (pm.playlist.length === 0) return;
-
-        initialRestoreAttempted = true;
-
-        try {
-            const qs = cm.state.queueState;
-            if (!qs || !qs.currentTrackPath) {
-                pm.resetQueueAndPosition();
-                if (window.PlayerController) {
-                    window.PlayerController.loadTrack();
-                    if (cm.state.options && cm.state.options.autoPlayAtStartup) {
-                        window.PlayerController.playAudio();
-                    }
-                }
-                return;
-            }
-
-            let currentGIdx = pm.playlist.findIndex(t => t.originalPath === qs.currentTrackPath);
-            if (currentGIdx === -1) {
-                cm.saveQueueState(null);
-                if (pm.playlist.length > 0) {
-                    pm.resetQueueAndPosition();
-                    if (window.PlayerController) {
-                        window.PlayerController.loadTrack();
-                        if (cm.state.options && cm.state.options.autoPlayAtStartup) {
-                            window.PlayerController.playAudio();
-                        }
-                    }
-                }
-                return;
-            }
-
-            if (qs.isCustomMode && Array.isArray(qs.activeIndicesPaths) && qs.activeIndicesPaths.length > 0) {
-                let restoredActive = qs.activeIndicesPaths
-                    .map(p => pm.playlist.findIndex(t => t.originalPath === p))
-                    .filter(idx => idx !== -1);
-                if (restoredActive.length > 0) {
-                    pm.activeIndices = restoredActive;
-                    pm.isCustomMode = true;
-                    pm.activePlaylistName = qs.activePlaylistName || null;
-                }
-            } else {
-                pm.isCustomMode = false;
-                pm.activePlaylistName = null;
-            }
-
-            pm.isShuffle = !!qs.isShuffle;
-            const shuffleBtn = document.getElementById('music-shuffle');
-            if (shuffleBtn) {
-                shuffleBtn.innerText = pm.isShuffle ? ui.t('[shuffle (x)]') : ui.t('[shuffle ( )]');
-            }
-
-            pm.currentGlobalIdx = currentGIdx;
-
-            if (Array.isArray(qs.manualQueuePaths)) {
-                let restoredManual = qs.manualQueuePaths
-                    .map(p => pm.playlist.findIndex(t => t.originalPath === p))
-                    .filter(idx => idx !== -1);
-                pm.manualQueue.length = 0;
-                pm.manualQueue.push(...restoredManual);
-            }
-
-            if (Array.isArray(qs.historyPaths)) {
-                let restoredHist = qs.historyPaths
-                    .map(p => pm.playlist.findIndex(t => t.originalPath === p))
-                    .filter(idx => idx !== -1);
-                pm.history.length = 0;
-                pm.history.push(...restoredHist);
-            }
-
-            if (Array.isArray(qs.upcomingQueuePaths) && qs.upcomingQueuePaths.length > 0) {
-                let restoredUpcoming = qs.upcomingQueuePaths
-                    .map(p => pm.playlist.findIndex(t => t.originalPath === p))
-                    .filter(idx => idx !== -1);
-                if (restoredUpcoming.length > 0) {
-                    pm.upcomingQueue.length = 0;
-                    pm.upcomingQueue.push(...restoredUpcoming);
-                }
-            }
-
-            if (qs.currentTime > 0) {
-                pendingRestoreTime = qs.currentTime;
-            }
-
-            if (window.UIController) {
-                window.UIController.updateNowPlayingHeader();
-                window.UIController.refreshIndices();
-                if (searchInput && searchInput.value) window.UIController.executeSearch();
-            }
-            if (window.PlayerController) {
-                window.PlayerController.loadTrack();
-                if (cm.state.options && cm.state.options.autoPlayAtStartup) {
-                    window.PlayerController.playAudio();
-                }
-            }
-        } catch (err) {
-            console.warn("Error restoring last queue position:", err);
-        }
-    }
 
     window.onIndexingComplete = function() {
         if (indexingModal) {
             indexingModal.style.display = 'none';
         }
         if (!initialRestoreAttempted && cm.state.firstRun === false) {
-            if (cm.state.options && cm.state.options.rememberLastQueue !== false) {
-                attemptRestoreLastQueuePosition();
-            } else if (pm.playlist.length > 0) {
+            initialRestoreAttempted = true;
+            if (pm.playlist.length > 0) {
                 pm.resetQueueAndPosition();
                 if (window.PlayerController) {
                     window.PlayerController.loadTrack();
@@ -326,15 +212,12 @@ document.addEventListener("DOMContentLoaded", function() {
 
         if (wasEmpty && pm.playlist.length > 0) {
             if (!initialRestoreAttempted && cm.state.firstRun === false) {
-                if (cm.state.options && cm.state.options.rememberLastQueue !== false) {
-                    attemptRestoreLastQueuePosition();
-                } else {
-                    pm.resetQueueAndPosition();
-                    if (window.PlayerController) {
-                        window.PlayerController.loadTrack();
-                        if (cm.state.options && cm.state.options.autoPlayAtStartup) {
-                            window.PlayerController.playAudio();
-                        }
+                initialRestoreAttempted = true;
+                pm.resetQueueAndPosition();
+                if (window.PlayerController) {
+                    window.PlayerController.loadTrack();
+                    if (cm.state.options && cm.state.options.autoPlayAtStartup) {
+                        window.PlayerController.playAudio();
                     }
                 }
             }
@@ -395,10 +278,6 @@ document.addEventListener("DOMContentLoaded", function() {
             }
 
             if (timeTotal) timeTotal.innerText = formatTime(audioEl.duration);
-            if (pendingRestoreTime !== null && audioEl.duration) {
-                audioEl.currentTime = Math.min(pendingRestoreTime, audioEl.duration);
-                pendingRestoreTime = null;
-            }
             let track = pm.getActiveTrack();
             if (track && audioEl.duration) {
                 track.duration = audioEl.duration;
@@ -434,12 +313,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
                 if (timeCurrent) timeCurrent.innerText = formatTime(audioEl.currentTime);
                 if (window.goUpdateMprisPosition) window.goUpdateMprisPosition(audioEl.currentTime);
-
-                const now = Date.now();
-                if (now - lastSaveTime > 3000) {
-                    lastSaveTime = now;
-                    if (window.PlayerController) window.PlayerController.saveCurrentQueueState();
-                }
             }
         });
 

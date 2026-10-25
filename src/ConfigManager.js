@@ -9,10 +9,9 @@ window.ConfigManager = (function() {
         visualizer: true,
         charOverride: null,
         isUwu: false,
-        options: { notifications: true, trackNotif: true, hintsNotif: true, notifDuration: 5000, marqueeSpeed: 'normal', notifPosition: 'tl', expie: false, timebar: true, fullscreen: false, autoPlayAtStartup: false, rememberLastQueue: true },
+        options: { notifications: true, trackNotif: true, hintsNotif: true, notifDuration: 5000, marqueeSpeed: 'normal', notifPosition: 'tl', expie: false, timebar: true, fullscreen: false, autoPlayAtStartup: false },
         nativeDir: "",
-        firstRun: true,
-        queueState: null
+        firstRun: true
     };
 
     function syncState() {
@@ -74,11 +73,6 @@ window.ConfigManager = (function() {
         syncState();
     }
 
-    function saveQueueState(qState) {
-        state.queueState = qState;
-        syncState();
-    }
-
     return {
         get state() { return state; },
         loadState,
@@ -89,7 +83,6 @@ window.ConfigManager = (function() {
         saveVisualizer,
         saveNativeDir,
         savePlaylists,
-        saveQueueState,
         syncState,
         importConfig(jsonStr) {
             try {
