@@ -23,7 +23,7 @@ The following features are critical and MUST NOT be broken, altered, or removed 
 ## Versioning Instructions for Agents
 
 <!-- AGENT VERSIONING COMMENT
-Current Nightly Version: v67-nightly
+Current Nightly Version: v68-nightly
 Current Stable Version: v1
 Active Mode: nightly
 
