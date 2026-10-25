@@ -748,10 +748,39 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     };
 
+    let initialRestoreAttempted = false;
+
+    async function attemptRestoreLastQueuePosition() {
+        if (initialRestoreAttempted) return;
+        initialRestoreAttempted = true;
+
+        if (cm.state.firstRun !== false) return;
+        if (cm.state.options && cm.state.options.rememberLastQueue === false) return;
+        if (!window.goGetPlaylistTracks) return;
+
+        try {
+            let recentsTracks = await window.goGetPlaylistTracks("recents");
+            if (recentsTracks && recentsTracks.length > 0) {
+                let lastTrack = recentsTracks[0];
+                let gIdx = pm.playlist.findIndex(t => t.originalPath === lastTrack.originalPath);
+                if (gIdx !== -1) {
+                    pm.playTrackByGlobalIndex(gIdx);
+                    loadTrack();
+                    if (cm.state.options && cm.state.options.autoPlayAtStartup) {
+                        playAudio();
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn("Error restoring last queue position:", err);
+        }
+    }
+
     window.onIndexingComplete = function() {
         if (indexingModal) {
             indexingModal.style.display = 'none';
         }
+        attemptRestoreLastQueuePosition();
     };
 
     if (indexingCancelBtn) {
@@ -812,7 +841,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
         if (wasEmpty) {
             loadTrack();
-            if (cm.state.options && cm.state.options.autoPlayAtStartup) {
+            if (!initialRestoreAttempted && cm.state.firstRun === false && cm.state.options && cm.state.options.rememberLastQueue !== false) {
+                attemptRestoreLastQueuePosition();
+            } else if (cm.state.options && cm.state.options.autoPlayAtStartup) {
                 playAudio();
             }
         }
@@ -1214,6 +1245,13 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function playAudio() {
         if (!pm.getActiveTrack()) return;
+        let activeTrack = pm.getActiveTrack();
+        if (activeTrack && activeTrack.originalPath && window.goAddToRecents) {
+            window.goAddToRecents(activeTrack.originalPath);
+            if (currentListsView === 'playlist' && currentViewingPlaylist === 'recents') {
+                renderPlaylistTracks();
+            }
+        }
         ae.initAudioAPI(cm.state.eq);
         try {
             let p = ae.play();
@@ -1435,7 +1473,7 @@ document.addEventListener("DOMContentLoaded", function() {
             let count = pl.trackCount;
             let displayCount = `[${count} tracks]`;
             html += `<div style="display: flex; align-items: center; margin-bottom: 5px;">`;
-            if (key !== "favorites" && currentListsView !== 'add') {
+            if (key !== "favorites" && key !== "recents" && currentListsView !== 'add') {
                 html += `<a href="#" class="del-list-btn" data-name="${key}" style="color: #ff5555; text-decoration: none; margin-right: 10px;">[x]</a>`;
             } else if (currentListsView !== 'add') {
                 html += `<span style="display: inline-block; width: 30px;"></span>`;
@@ -1503,7 +1541,11 @@ document.addEventListener("DOMContentLoaded", function() {
             let num = String(i + 1).padStart(2, '0');
             let line = `| ${num}. ${displayTitle}`;
 
-            html += `<div style="display: flex;"><a href="#" class="del-track-btn" data-path="${encodeURIComponent(track.originalPath)}" style="color: #ff5555; text-decoration: none; margin-right: 5px;">[x]</a><a href="#" class="pl-track-link" data-idx="${i}" style="display: block; text-decoration: none; flex-grow: 1;">${ui.t(line)}</a></div>`;
+            html += `<div style="display: flex;">`;
+            if (currentViewingPlaylist !== "recents") {
+                html += `<a href="#" class="del-track-btn" data-path="${encodeURIComponent(track.originalPath)}" style="color: #ff5555; text-decoration: none; margin-right: 5px;">[x]</a>`;
+            }
+            html += `<a href="#" class="pl-track-link" data-idx="${i}" style="display: block; text-decoration: none; flex-grow: 1;">${ui.t(line)}</a></div>`;
         });
 
         listsModalContent.innerHTML = html;
@@ -2257,7 +2299,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         let lines = [
             `+-- STATS FOR NERDS --------------------+`,
-            `| Version: svmp-lqm 0.0.61 (nightly-lqm)`,
+            `| Version: svmp-lqm 0.0.64 (nightly-lqm)`,
             `| FPS: ${currentFps}`,
             `| Audio State: ${stateStr}`,
             `| Audio Position: ${posStr}`,
@@ -2866,7 +2908,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // Version check & patch notes notification
-    const CURRENT_VERSION = "0.0.63";
+    const CURRENT_VERSION = "0.0.64";
     const lastSeenVer = localStorage.getItem('svmp_last_seen_version');
     if (lastSeenVer === null) {
         localStorage.setItem('svmp_last_seen_version', CURRENT_VERSION);
