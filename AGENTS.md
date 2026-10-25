@@ -18,6 +18,8 @@ The following features are critical and MUST NOT be broken, altered, or removed 
 
 - Ignore anything in the ARCHIVE folder
 
+- Ignore README.md
+
 ## Versioning Instructions for Agents
 
 <!-- AGENT VERSIONING COMMENT
