@@ -114,6 +114,12 @@ do_install() {
     mkdir -p "$INSTALL_DIR/src"
     cp -rf src/* "$INSTALL_DIR/src/"
 
+    # Save current git commit hash if available
+    COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "")
+    if [ -n "$COMMIT_HASH" ]; then
+        echo "$COMMIT_HASH" > "$INSTALL_DIR/.commit"
+    fi
+
     # Move config if present locally or preserve existing config
     if [ -f "svmp-lqm.conf" ] && [ ! -f "$INSTALL_DIR/svmp-lqm.conf" ]; then
         cp -f svmp-lqm.conf "$INSTALL_DIR/"
