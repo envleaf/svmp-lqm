@@ -345,6 +345,7 @@ window.UIController = (function() {
             let html = ui.t(str);
             ai.forEach((globalIdx, i) => {
                 let track = pl[globalIdx];
+                if (!track) return;
                 let num = String(i + 1).padStart(2, '0');
                 let titleStr = getQueuePrefix(globalIdx) + track.title;
                 let line = `| ${num}. ${titleStr}`;
@@ -442,6 +443,7 @@ window.UIController = (function() {
         const searchInput = document.getElementById('search-input');
         const searchResults = document.getElementById('search-results');
         const searchQueueAllBtn = document.getElementById('search-queue-all');
+        const searchClearBtn = document.getElementById('search-clear');
         if (!searchInput || !searchResults) return;
 
         let rawQuery = searchInput.value.trim();
@@ -449,7 +451,10 @@ window.UIController = (function() {
             searchResults.innerHTML = '';
             matchingSearchResults = [];
             if (searchQueueAllBtn) searchQueueAllBtn.style.display = 'none';
+            if (searchClearBtn) searchClearBtn.style.display = 'none';
             return;
+        } else {
+            if (searchClearBtn) searchClearBtn.style.display = 'inline-block';
         }
 
         const parsed = parseSearchQuery(rawQuery);
@@ -577,14 +582,22 @@ window.UIController = (function() {
         document.getElementById('song-info-album').innerText = track.album || "Unknown";
         document.getElementById('song-info-bitrate').innerText = "Unknown";
 
+        const playFromBtn = document.getElementById('song-info-play-from');
+        const goToBtn = document.getElementById('song-info-go-to');
         const playAlbumBtn = document.getElementById('song-info-play-album');
         const playArtistBtn = document.getElementById('song-info-play-artist');
+        const gotoAlbumBtn = document.getElementById('song-info-goto-album');
+        const gotoArtistBtn = document.getElementById('song-info-goto-artist');
 
         let hasAlbum = track.album && track.album.trim() !== '' && track.album.toLowerCase() !== 'unknown';
         let hasArtist = track.artist && track.artist.trim() !== '' && track.artist.toLowerCase() !== 'unknown';
 
-        if (playAlbumBtn) playAlbumBtn.style.display = hasAlbum ? 'inline-block' : 'none';
-        if (playArtistBtn) playArtistBtn.style.display = hasArtist ? 'inline-block' : 'none';
+        if (playFromBtn) playFromBtn.style.display = (hasAlbum || hasArtist) ? 'inline-block' : 'none';
+        if (goToBtn) goToBtn.style.display = (hasAlbum || hasArtist) ? 'inline-block' : 'none';
+        if (playAlbumBtn) playAlbumBtn.style.display = 'none';
+        if (playArtistBtn) playArtistBtn.style.display = 'none';
+        if (gotoAlbumBtn) gotoAlbumBtn.style.display = 'none';
+        if (gotoArtistBtn) gotoArtistBtn.style.display = 'none';
 
         if (infoArt) infoArt.style.display = 'none';
         if (infoArtPlaceholder) infoArtPlaceholder.style.display = 'flex';
@@ -614,7 +627,10 @@ window.UIController = (function() {
                         if (tag.tags.album) {
                             document.getElementById('song-info-album').innerText = tag.tags.album;
                             track.album = tag.tags.album;
-                            if (playAlbumBtn) playAlbumBtn.style.display = 'inline-block';
+                            let hasAlbumNow = true;
+                            let hasArtistNow = track.artist && track.artist.trim() !== '' && track.artist.toLowerCase() !== 'unknown';
+                            if (playFromBtn && playFromBtn.style.display !== 'none') playFromBtn.style.display = 'inline-block';
+                            if (goToBtn && goToBtn.style.display !== 'none') goToBtn.style.display = 'inline-block';
                         }
 
                         if (tag.tags.picture) {
@@ -786,6 +802,7 @@ window.UIController = (function() {
         const volBar = document.getElementById('vol-bar');
         const asciiBar = document.getElementById('ascii-bar');
         const searchInput = document.getElementById('search-input');
+        const searchClearBtn = document.getElementById('search-clear');
         const playlistInput = document.getElementById('playlist-input');
         const nowPlayingLabel = document.getElementById('now-playing-label');
 
@@ -1012,21 +1029,6 @@ window.UIController = (function() {
             });
         }
 
-        const songInfoPlay = document.getElementById('song-info-play');
-        if (songInfoPlay) {
-            songInfoPlay.addEventListener('click', e => {
-                e.preventDefault();
-                if (currentInfoIdx !== -1) {
-                    pm.playTrackByGlobalIndex(currentInfoIdx);
-                    window.PlayerController.loadTrack();
-                    window.PlayerController.playAudio();
-                    refreshIndices();
-                    if (searchInput && searchInput.value) executeSearch();
-                    document.getElementById('song-info-modal').style.display = 'none';
-                }
-            });
-        }
-
         const songInfoQueue = document.getElementById('song-info-queue');
         if (songInfoQueue) {
             songInfoQueue.addEventListener('click', e => {
@@ -1038,7 +1040,94 @@ window.UIController = (function() {
             });
         }
 
+        const playFromBtn = document.getElementById('song-info-play-from');
+        const goToBtn = document.getElementById('song-info-go-to');
         const songInfoPlayAlbum = document.getElementById('song-info-play-album');
+        const songInfoPlayArtist = document.getElementById('song-info-play-artist');
+        const gotoArtistBtn = document.getElementById('song-info-goto-artist');
+        const gotoAlbumBtn = document.getElementById('song-info-goto-album');
+
+        if (playFromBtn) {
+            playFromBtn.addEventListener('click', e => {
+                e.preventDefault();
+                if (currentInfoIdx === -1) return;
+                let track = pm.playlist[currentInfoIdx];
+                if (!track) return;
+                let hasAlbum = track.album && track.album.trim() !== '' && track.album.toLowerCase() !== 'unknown';
+                let hasArtist = track.artist && track.artist.trim() !== '' && track.artist.toLowerCase() !== 'unknown';
+
+                playFromBtn.style.display = 'none';
+                if (songInfoPlayArtist) songInfoPlayArtist.style.display = hasArtist ? 'inline-block' : 'none';
+                if (songInfoPlayAlbum) songInfoPlayAlbum.style.display = hasAlbum ? 'inline-block' : 'none';
+
+                if (goToBtn) goToBtn.style.display = (hasAlbum || hasArtist) ? 'inline-block' : 'none';
+                if (gotoArtistBtn) gotoArtistBtn.style.display = 'none';
+                if (gotoAlbumBtn) gotoAlbumBtn.style.display = 'none';
+            });
+        }
+
+        if (goToBtn) {
+            goToBtn.addEventListener('click', e => {
+                e.preventDefault();
+                if (currentInfoIdx === -1) return;
+                let track = pm.playlist[currentInfoIdx];
+                if (!track) return;
+                let hasAlbum = track.album && track.album.trim() !== '' && track.album.toLowerCase() !== 'unknown';
+                let hasArtist = track.artist && track.artist.trim() !== '' && track.artist.toLowerCase() !== 'unknown';
+
+                goToBtn.style.display = 'none';
+                if (gotoArtistBtn) gotoArtistBtn.style.display = hasArtist ? 'inline-block' : 'none';
+                if (gotoAlbumBtn) gotoAlbumBtn.style.display = hasAlbum ? 'inline-block' : 'none';
+
+                if (playFromBtn) playFromBtn.style.display = (hasAlbum || hasArtist) ? 'inline-block' : 'none';
+                if (songInfoPlayArtist) songInfoPlayArtist.style.display = 'none';
+                if (songInfoPlayAlbum) songInfoPlayAlbum.style.display = 'none';
+            });
+        }
+
+        function triggerSearchQuery(queryStr) {
+            document.getElementById('song-info-modal').style.display = 'none';
+            const searchBox = document.getElementById('search-box');
+            const searchBtn = document.getElementById('music-search');
+            const searchInput = document.getElementById('search-input');
+
+            if (searchBox && searchBox.style.display !== 'block') {
+                if (searchBtn) {
+                    searchBtn.click();
+                }
+            }
+
+            if (searchInput) {
+                searchInput.value = queryStr;
+                executeSearch();
+                setTimeout(() => searchInput.focus(), 10);
+            }
+        }
+
+        if (gotoArtistBtn) {
+            gotoArtistBtn.addEventListener('click', e => {
+                e.preventDefault();
+                if (currentInfoIdx !== -1) {
+                    let track = pm.playlist[currentInfoIdx];
+                    if (track && track.artist && track.artist.toLowerCase() !== 'unknown') {
+                        triggerSearchQuery(`a: ${track.artist.toLowerCase().trim()}`);
+                    }
+                }
+            });
+        }
+
+        if (gotoAlbumBtn) {
+            gotoAlbumBtn.addEventListener('click', e => {
+                e.preventDefault();
+                if (currentInfoIdx !== -1) {
+                    let track = pm.playlist[currentInfoIdx];
+                    if (track && track.album && track.album.toLowerCase() !== 'unknown') {
+                        triggerSearchQuery(`b: ${track.album.toLowerCase().trim()}`);
+                    }
+                }
+            });
+        }
+
         if (songInfoPlayAlbum) {
             songInfoPlayAlbum.addEventListener('click', e => {
                 e.preventDefault();
@@ -1075,7 +1164,6 @@ window.UIController = (function() {
             });
         }
 
-        const songInfoPlayArtist = document.getElementById('song-info-play-artist');
         if (songInfoPlayArtist) {
             songInfoPlayArtist.addEventListener('click', e => {
                 e.preventDefault();
@@ -1135,6 +1223,15 @@ window.UIController = (function() {
             });
         }
 
+        if (searchClearBtn) {
+            searchClearBtn.addEventListener('click', e => {
+                e.preventDefault();
+                if (searchInput) searchInput.value = '';
+                executeSearch();
+                if (searchInput) searchInput.focus();
+            });
+        }
+
         const searchQueueAllBtn = document.getElementById('search-queue-all');
         if (searchQueueAllBtn) {
             searchQueueAllBtn.addEventListener('click', e => {
@@ -1162,6 +1259,9 @@ window.UIController = (function() {
         if (searchInput) {
             let searchDebounceTimer;
             searchInput.addEventListener('input', () => {
+                if (searchClearBtn) {
+                    searchClearBtn.style.display = searchInput.value.length > 0 ? 'inline-block' : 'none';
+                }
                 clearTimeout(searchDebounceTimer);
                 searchDebounceTimer = setTimeout(executeSearch, 250);
             });
