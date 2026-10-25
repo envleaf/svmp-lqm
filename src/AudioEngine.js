@@ -106,6 +106,9 @@ window.AudioEngine = (function() {
 
     function pause() {
         audio.pause();
+        if (audioCtx && audioCtx.state === 'running') {
+            audioCtx.suspend();
+        }
     }
 
     function setVolume(val) {
