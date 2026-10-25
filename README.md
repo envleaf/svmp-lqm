@@ -20,17 +20,30 @@ i dont know
 
 ### Screenshots
 Main Screen
+
 <img width="1918" height="1080" alt="image" src="https://github.com/user-attachments/assets/0f49bbfb-a684-418e-850b-20e470358c7b" />
+
 Theming
+
 <img width="1918" height="1080" alt="image" src="https://github.com/user-attachments/assets/17b35820-326e-4b31-96a0-5b5290ca8370" />
+
 Options and Notifications
+
 <img width="1918" height="1080" alt="image" src="https://github.com/user-attachments/assets/24f52f72-d3aa-4171-bba2-59e2ce12ef22" />
+
 Focus Mode
+
 <img width="1918" height="1080" alt="image" src="https://github.com/user-attachments/assets/73f2e8ec-9af7-40b6-8047-b5831de056cf" />
+
 Info Screen
+
 <img width="1917" height="1080" alt="image" src="https://github.com/user-attachments/assets/644d0492-abe9-4571-848d-e18a92f70dc3" />
+
 Lyrics
+
 <img width="696" height="362" alt="image" src="https://github.com/user-attachments/assets/23fc4241-6524-4ebd-a613-cc9cc25243b0" />
+
 Command Pallete
+
 <img width="600" height="306" alt="image" src="https://github.com/user-attachments/assets/309e7cf7-e1e3-446e-848b-2cf25090f8e9" />
 
