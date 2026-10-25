@@ -2316,6 +2316,16 @@ document.addEventListener("DOMContentLoaded", function() {
     const optStatMonitorBtn = document.getElementById('opt-stat-monitor');
     const optResetBtn = document.getElementById('opt-reset');
     const optDisableErrorSkipBtn = document.getElementById('opt-disable-error-skip');
+    const checkUpdatesBtn = document.getElementById('opt-check-updates');
+
+    if (checkUpdatesBtn) {
+        checkUpdatesBtn.addEventListener('click', e => {
+            e.preventDefault();
+            if (window.UpdateManager) {
+                window.UpdateManager.checkForUpdates(true);
+            }
+        });
+    }
 
     if (optMobileBtn) optMobileBtn.addEventListener('click', e => { e.preventDefault(); cm.state.isMobile = !cm.state.isMobile; if(cm.state.isMobile) cm.state.isSway = false; localStorage.setItem('env_mobile', cm.state.isMobile); updateOptionsUI(); });
     if (optStatMonitorBtn) optStatMonitorBtn.addEventListener('click', e => { e.preventDefault(); toggleStatMonitor(); });

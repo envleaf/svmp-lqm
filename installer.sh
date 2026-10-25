@@ -7,10 +7,10 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
 # Parse version from AGENTS.md
-VERSION=$(grep -oP 'Current Version:\s*\K[0-9.]+' AGENTS.md 2>/dev/null || grep 'Current Version:' AGENTS.md | sed -E 's/.*Current Version:[[:space:]]*([0-9.]+).*/\1/')
+VERSION=$(grep -oP 'Current Nightly Version:\s*\K\S+' AGENTS.md 2>/dev/null || grep -oP 'Current Stable Version:\s*\K\S+' AGENTS.md 2>/dev/null || echo "v64-nightly")
 
 if [ -z "$VERSION" ]; then
-    VERSION="0.0.47"
+    VERSION="v64-nightly"
 fi
 
 INSTALL_DIR="$HOME/.config/svmp-lqm"

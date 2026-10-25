@@ -508,6 +508,14 @@ func main() {
 		return goDeletePlaylist(playlistName)
 	})
 
+	w.Bind("goCheckGitRepo", func() GitRepoInfo {
+		return goCheckGitRepo()
+	})
+
+	w.Bind("goPerformUpdate", func() UpdateResult {
+		return goPerformUpdate()
+	})
+
 	initMpris()
 
 	// Inject the initial config into the window object
@@ -605,6 +613,146 @@ func listDirectory(path string) {
 	w.Dispatch(func() {
 		w.Eval(js)
 	})
+}
+
+type UpdateResult struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+type GitRepoInfo struct {
+	IsGitRepo     bool   `json:"isGitRepo"`
+	CurrentCommit string `json:"currentCommit"`
+	CurrentBranch string `json:"currentBranch"`
+}
+
+func goCheckGitRepo() GitRepoInfo {
+	info := GitRepoInfo{IsGitRepo: false}
+
+	cmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+	cmd.Dir = execDir
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		info.IsGitRepo = true
+		info.CurrentCommit = strings.TrimSpace(string(out))
+	} else {
+		return info
+	}
+
+	cmdBranch := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmdBranch.Dir = execDir
+	outBranch, err := cmdBranch.CombinedOutput()
+	if err == nil {
+		info.CurrentBranch = strings.TrimSpace(string(outBranch))
+	}
+
+	return info
+}
+
+func copyDir(src, dst string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if info.IsDir() {
+			return os.MkdirAll(target, info.Mode())
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, info.Mode())
+	})
+}
+
+func goPerformUpdate() UpdateResult {
+	if _, err := exec.LookPath("git"); err != nil {
+		return UpdateResult{Success: false, Message: "git command not found in PATH."}
+	}
+	if _, err := exec.LookPath("go"); err != nil {
+		return UpdateResult{Success: false, Message: "go command not found in PATH."}
+	}
+
+	backupDir := filepath.Join(execDir, ".update_backup")
+	_ = os.RemoveAll(backupDir)
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
+		return UpdateResult{Success: false, Message: "Failed to create backup directory."}
+	}
+
+	binName := "svmp-lqm"
+	if runtime.GOOS == "windows" {
+		binName = "svmp-lqm.exe"
+	}
+	origBin := filepath.Join(execDir, binName)
+	backupBin := filepath.Join(backupDir, binName)
+	origSrc := filepath.Join(execDir, "src")
+	backupSrc := filepath.Join(backupDir, "src")
+
+	backedUpBin := false
+	if _, err := os.Stat(origBin); err == nil {
+		if data, err := os.ReadFile(origBin); err == nil {
+			_ = os.WriteFile(backupBin, data, 0755)
+			backedUpBin = true
+		}
+	}
+
+	backedUpSrc := false
+	if _, err := os.Stat(origSrc); err == nil {
+		if err := copyDir(origSrc, backupSrc); err == nil {
+			backedUpSrc = true
+		}
+	}
+
+	restoreBackup := func(reason string) UpdateResult {
+		log.Println("Update failed:", reason, "- Restoring backup...")
+		if backedUpBin {
+			if data, err := os.ReadFile(backupBin); err == nil {
+				_ = os.WriteFile(origBin, data, 0755)
+			}
+		}
+		if backedUpSrc {
+			_ = os.RemoveAll(origSrc)
+			_ = copyDir(backupSrc, origSrc)
+		}
+		_ = os.RemoveAll(backupDir)
+		return UpdateResult{Success: false, Message: fmt.Sprintf("Update failed (%s). Restored previous state.", reason)}
+	}
+
+	// Run git pull
+	pullCmd := exec.Command("git", "pull")
+	pullCmd.Dir = execDir
+	pullOut, err := pullCmd.CombinedOutput()
+	if err != nil {
+		return restoreBackup(fmt.Sprintf("git pull failed: %s", strings.TrimSpace(string(pullOut))))
+	}
+
+	// Run go build
+	buildCmd := exec.Command("go", "build", "-o", binName, ".")
+	buildCmd.Dir = execDir
+	homeDir, _ := os.UserHomeDir()
+	pkgPath := filepath.Join(homeDir, ".local", "lib", "pkgconfig")
+	currentPkg := os.Getenv("PKG_CONFIG_PATH")
+	buildCmd.Env = append(os.Environ(), fmt.Sprintf("PKG_CONFIG_PATH=%s:%s", pkgPath, currentPkg))
+
+	buildOut, err := buildCmd.CombinedOutput()
+	if err != nil {
+		return restoreBackup(fmt.Sprintf("go build failed: %s", strings.TrimSpace(string(buildOut))))
+	}
+
+	// Verify binary exists
+	if _, err := os.Stat(origBin); err != nil {
+		return restoreBackup("compiled binary not found after build")
+	}
+
+	// Clean backup
+	_ = os.RemoveAll(backupDir)
+
+	return UpdateResult{Success: true, Message: "Update completed successfully!"}
 }
 
 type StatsInfo struct {

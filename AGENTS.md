@@ -21,17 +21,21 @@ The following features are critical and MUST NOT be broken, altered, or removed 
 ## Versioning Instructions for Agents
 
 <!-- AGENT VERSIONING COMMENT
-Current Version: 0.0.63
-Current Branch Tag: nightly-lqm
+Current Nightly Version: v64-nightly
+Current Stable Version: v1
+Active Mode: nightly
 
 Rules for Updating Versioning:
-1. Version format is MAJOR.MINOR.PATCH (e.g., 0.0.47).
-2. Automatically increase the patch version by one for every single commit.
-3. Starting version is 0.0.46 with branch tag "nightly-lqm".
-3. When the MINOR patch version increases (the second position in 0.0.0, e.g., from 0.0.x to 0.1.x), automatically update the branch tag from "nightly-lqm" to "release-lqm".
-4. The "LQM" suffix (-lqm) should NEVER be modified unless explicitly instructed.
-5. Note: The source repo being pulled from is envleaf/svmp, NOT envleaf/svmp-lqm.
-6. Always reflect version and branch tag updates in player.html inside the keybind modal:
-   Format: svmp-lqm <VERSION> (<BRANCH-TAG>)
-7. For every commit, update the patch notes modal (#patch-notes-modal) in src/player.html with a brief description of what changed in the new version along with the short git commit ID.
+1. Version format is a simple incrementing counter:
+   - For nightly builds: v<COUNTER>-nightly (e.g., v64-nightly). Automatically increase the nightly counter by 1 for every single commit.
+   - For stable builds: v<COUNTER> (e.g., v1).
+2. When tasked with making a "stable" update:
+   - Remove the "-nightly" suffix and use the Current Stable Version (incrementing stable counter by 1 if making a new stable release).
+   - Swap the UI display in src/player.html to reflect the stable version format (e.g., svmp-lqm v1).
+3. The "LQM" suffix (-lqm) should NEVER be modified unless explicitly instructed.
+4. Note: The repository being pulled from and checked for updates is envleaf/svmp-lqm.
+5. Always reflect version updates in player.html inside the keybind modal (#keybind-modal):
+   Format (nightly): svmp-lqm v64-nightly
+   Format (stable): svmp-lqm v1
+6. For every commit, update the patch notes modal (#patch-notes-modal) in src/player.html with a brief description of what changed in the new version along with the short git commit ID.
 -->
