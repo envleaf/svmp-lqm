@@ -240,7 +240,6 @@ window.UIController = (function() {
             pm.toggleQueue(globalIdx);
             refreshIndices();
             if (searchInput && searchInput.value) executeSearch();
-            if (window.PlayerController) window.PlayerController.saveCurrentQueueState();
         } else if (e.button === 0) { // Left click
             if (pm.activePlaylistName) {
                 pm.exitPlaylistQueue();
@@ -840,7 +839,6 @@ window.UIController = (function() {
                 pm.isShuffle = !pm.isShuffle;
                 shuffleBtn.innerText = pm.isShuffle ? ui.t('[shuffle (x)]') : ui.t('[shuffle ( )]');
                 renderQueueIndex();
-                if (window.PlayerController) window.PlayerController.saveCurrentQueueState();
             });
         }
 
@@ -1336,12 +1334,6 @@ window.UIController = (function() {
                         if (window.updateTimebarDisplay) window.updateTimebarDisplay();
                     } else if (opt === 'fullscreen') {
                         syncFullscreenState(val);
-                    } else if (opt === 'rememberLastQueue') {
-                        if (val === true) {
-                            if (window.PlayerController) window.PlayerController.saveCurrentQueueState();
-                        } else if (val === false) {
-                            cm.saveQueueState(null);
-                        }
                     }
                 }
                 updateOptionsUI();

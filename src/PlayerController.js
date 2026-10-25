@@ -108,34 +108,9 @@ window.PlayerController = (function() {
         return track;
     }
 
-    function saveCurrentQueueState() {
-        if (!cm.state.options || cm.state.options.rememberLastQueue === false) return;
-        const activeTrack = pm.getActiveTrack();
-        const audioEl = getAudioEl();
-        if (!activeTrack) {
-            cm.saveQueueState(null);
-            return;
-        }
-
-        const qState = {
-            currentTrackPath: activeTrack.originalPath || null,
-            currentTime: (audioEl ? audioEl.currentTime : 0) || 0,
-            manualQueuePaths: pm.manualQueue.map(idx => pm.playlist[idx]?.originalPath).filter(Boolean),
-            upcomingQueuePaths: pm.upcomingQueue.map(idx => pm.playlist[idx]?.originalPath).filter(Boolean),
-            historyPaths: pm.history.map(idx => pm.playlist[idx]?.originalPath).filter(Boolean),
-            activeIndicesPaths: pm.isCustomMode ? pm.activeIndices.map(idx => pm.playlist[idx]?.originalPath).filter(Boolean) : null,
-            isShuffle: pm.isShuffle,
-            isCustomMode: pm.isCustomMode,
-            activePlaylistName: pm.activePlaylistName
-        };
-
-        cm.saveQueueState(qState);
-    }
-
     function loadTrack() {
         clearInterval(marqueeInterval);
         let track = pm.getActiveTrack();
-        saveCurrentQueueState();
 
         const audioEl = getAudioEl();
         const trackTitleDisplay = getTrackTitleDisplay();
@@ -284,7 +259,6 @@ window.PlayerController = (function() {
         if (window.VisualEngine) window.VisualEngine.updateVisualizerDisplay();
         stopMarquee();
         if (window.goUpdateMprisStatus) window.goUpdateMprisStatus("Paused");
-        saveCurrentQueueState();
     }
 
     function nextTrack(isUserAction = false) {
@@ -517,8 +491,7 @@ window.PlayerController = (function() {
         uploadFiles: (toPlaylist) => uploadFiles(toPlaylist),
         startMarquee,
         stopMarquee,
-        fetchOnlineTrackMetadata,
-        saveCurrentQueueState
+        fetchOnlineTrackMetadata
     };
 
     return controller;
