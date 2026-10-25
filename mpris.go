@@ -215,7 +215,7 @@ func updateMprisStatus(status string) {
 	}
 }
 
-func updateMprisMetadata(title, artist, path string) {
+func updateMprisMetadata(title, artist, path, artUrl string) {
 	if mprisProps != nil {
 		trackID := dbus.ObjectPath("/org/mpris/MediaPlayer2/TrackList/Track")
 		metadata := map[string]dbus.Variant{

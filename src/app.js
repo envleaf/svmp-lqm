@@ -1075,6 +1075,54 @@ document.addEventListener("DOMContentLoaded", function() {
 
     let consecutiveErrorCount = 0;
 
+    async function fetchOnlineTrackMetadata(track) {
+        if (!track) return null;
+        if (track._fetchedOnlineMetadata) return track;
+        track._fetchedOnlineMetadata = true;
+
+        let targetTitle = track.title || track.originalName || '';
+        let targetArtist = track.artist || '';
+
+        targetTitle = targetTitle.replace(/\.(mp3|flac|wav|ogg|m4a)$/i, '').trim();
+
+        let query = (targetArtist && targetArtist.toLowerCase() !== 'unknown') ? `${targetArtist} ${targetTitle}` : targetTitle;
+        if (!query) return track;
+
+        try {
+            let resp = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=5`);
+            let data = await resp.json();
+
+            if (data && data.results && data.results.length > 0) {
+                let bestMatch = data.results[0];
+                if (targetArtist && targetArtist.toLowerCase() !== 'unknown') {
+                    let match = data.results.find(r =>
+                        r.artistName && r.artistName.toLowerCase().includes(targetArtist.toLowerCase())
+                    );
+                    if (match) bestMatch = match;
+                }
+
+                if (bestMatch) {
+                    if ((!track.artist || track.artist.toLowerCase() === 'unknown' || track.artist === '') && bestMatch.artistName) {
+                        track.artist = bestMatch.artistName;
+                    }
+                    if ((!track.album || track.album.toLowerCase() === 'unknown' || track.album === '') && bestMatch.collectionName) {
+                        track.album = bestMatch.collectionName;
+                    }
+                    if ((!track.title || track.title.toLowerCase() === 'unknown' || track.title === '') && bestMatch.trackName) {
+                        track.title = bestMatch.trackName;
+                    }
+
+                    if (bestMatch.artworkUrl100) {
+                        track.onlineArtUrl = bestMatch.artworkUrl100.replace('100x100bb', '600x600bb').replace('100x100', '600x600');
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("iTunes online metadata lookup failed:", e);
+        }
+        return track;
+    }
+
     // --- Player Logic ---
     function loadTrack() {
         clearInterval(marqueeInterval);
@@ -1085,8 +1133,30 @@ document.addEventListener("DOMContentLoaded", function() {
             ui.showNotification(`now playing: ${notifStr}`);
         }
 
+        let initialArtUrl = track ? (track.onlineArtUrl || '') : '';
         if (window.goUpdateMprisMetadata && track) {
-            window.goUpdateMprisMetadata(track.title || "Unknown Title", track.artist || "Unknown Artist", track.originalPath || "");
+            window.goUpdateMprisMetadata(track.title || "Unknown Title", track.artist || "Unknown Artist", track.originalPath || "", initialArtUrl);
+        }
+
+        if (track && (!track.artist || track.artist.toLowerCase() === 'unknown' || !track.album || track.album.toLowerCase() === 'unknown' || !track.onlineArtUrl)) {
+            fetchOnlineTrackMetadata(track).then(() => {
+                let currentTrack = pm.getActiveTrack();
+                if (currentTrack && currentTrack === track) {
+                    if (window.goUpdateMprisMetadata) {
+                        let updatedArt = track.onlineArtUrl || '';
+                        window.goUpdateMprisMetadata(track.title || "Unknown Title", track.artist || "Unknown Artist", track.originalPath || "", updatedArt);
+                    }
+                    if (trackTitleDisplay && pm.currentIndex >= 0) {
+                        let trackNumDisplay = pm.currentIndex + 1;
+                        let totalDisplay = pm.activeIndices.length;
+                        fullTitleString = track.title + " *** ";
+                        trackTitleDisplay.innerHTML = `${ui.t(track.title)} <span style="color: var(--prompt-color); font-size: 0.9em;">[${trackNumDisplay}/${totalDisplay}]</span>`;
+                    }
+                    renderGlobalIndex();
+                    renderCustomPlaylistIndex();
+                    renderQueueIndex();
+                }
+            });
         }
         if (!track) {
             trackTitleDisplay.innerHTML = ui.t(`no local tracks mapped to RAM.`);
@@ -1132,7 +1202,9 @@ document.addEventListener("DOMContentLoaded", function() {
                 else lyricsContent.innerText = ui.t(`+-- plain lyrics --------------+\n\n${plain}\n\n+------------------------------+`);
             },
             () => { lyricsContent.innerText = ui.t("error connecting to lyrics database."); },
-            () => { lyricsContent.innerText = ui.t("no lyrics found in external database.\n(custom/indie tracks often return empty)"); }
+            () => { lyricsContent.innerText = ui.t("no lyrics found in external database.\n(custom/indie tracks often return empty)"); },
+            track.artist || '',
+            audioEl.duration || track.duration || 0
         );
     }
 
@@ -1631,10 +1703,14 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    function openInfoModal(globalIdx) {
+    async function openInfoModal(globalIdx) {
         const track = pm.playlist[globalIdx];
         if (!track) return;
         currentInfoIdx = globalIdx;
+
+        if (!track._fetchedOnlineMetadata && (!track.artist || track.artist.toLowerCase() === 'unknown' || !track.album || track.album.toLowerCase() === 'unknown' || !track.onlineArtUrl)) {
+            await fetchOnlineTrackMetadata(track);
+        }
 
         document.getElementById('song-info-title').innerText = track.title || "Unknown";
         document.getElementById('song-info-artist').innerText = track.artist || "Unknown";
@@ -1652,6 +1728,24 @@ document.addEventListener("DOMContentLoaded", function() {
 
         infoArt.style.display = 'none';
         infoArtPlaceholder.style.display = 'flex';
+
+        infoArt.onerror = async function() {
+            if (track && !track._onlineArtFailed) {
+                track._onlineArtFailed = true;
+                if (!track._fetchedOnlineMetadata) {
+                    await fetchOnlineTrackMetadata(track);
+                }
+                if (track.onlineArtUrl) {
+                    infoArt.onerror = null;
+                    infoArt.src = track.onlineArtUrl;
+                    infoArt.style.display = 'block';
+                    infoArtPlaceholder.style.display = 'none';
+                    return;
+                }
+            }
+            infoArt.style.display = 'none';
+            infoArtPlaceholder.style.display = 'flex';
+        };
 
         if (track.file && window.jsmediatags) {
              window.jsmediatags.read(track.file, {
@@ -1671,14 +1765,31 @@ document.addEventListener("DOMContentLoaded", function() {
                          infoArt.src = `data:${format};base64,${window.btoa(base64String)}`;
                          infoArt.style.display = 'block';
                          infoArtPlaceholder.style.display = 'none';
+                     } else if (track.onlineArtUrl) {
+                         infoArt.src = track.onlineArtUrl;
+                         infoArt.style.display = 'block';
+                         infoArtPlaceholder.style.display = 'none';
                      }
                  },
-                 onError: function(error) {}
+                 onError: function(error) {
+                     if (track.onlineArtUrl) {
+                         infoArt.src = track.onlineArtUrl;
+                         infoArt.style.display = 'block';
+                         infoArtPlaceholder.style.display = 'none';
+                     }
+                 }
              });
         } else if (!track.file && track.originalPath) {
-             // For native tracks, hit the local Go server for artwork
              let currentHost = window.location.host;
-             infoArt.src = `http://${currentHost}/art?path=${encodeURIComponent(track.originalPath)}`;
+             let artSrc = `http://${currentHost}/art?path=${encodeURIComponent(track.originalPath)}`;
+             if (track.onlineArtUrl) {
+                 artSrc += `&url=${encodeURIComponent(track.onlineArtUrl)}`;
+             }
+             infoArt.src = artSrc;
+             infoArt.style.display = 'block';
+             infoArtPlaceholder.style.display = 'none';
+        } else if (track.onlineArtUrl) {
+             infoArt.src = track.onlineArtUrl;
              infoArt.style.display = 'block';
              infoArtPlaceholder.style.display = 'none';
         }
@@ -2126,7 +2237,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         let lines = [
             `+-- STATS FOR NERDS --------------------+`,
-            `| Version: svmp-lqm 0.0.60 (nightly-lqm)`,
+            `| Version: svmp-lqm 0.0.61 (nightly-lqm)`,
             `| FPS: ${currentFps}`,
             `| Audio State: ${stateStr}`,
             `| Audio Position: ${posStr}`,
