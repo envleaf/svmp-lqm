@@ -688,6 +688,10 @@ func goCheckGitRepo() GitRepoInfo {
 		info.IsGitRepo = true
 		info.CurrentCommit = strings.TrimSpace(string(out))
 	} else {
+		commitFile := filepath.Join(execDir, ".commit")
+		if data, err := os.ReadFile(commitFile); err == nil {
+			info.CurrentCommit = strings.TrimSpace(string(data))
+		}
 		return info
 	}
 
@@ -735,6 +739,7 @@ func goPerformUpdate() UpdateResult {
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		return UpdateResult{Success: false, Message: "Failed to create backup directory."}
 	}
+	defer os.RemoveAll(backupDir)
 
 	binName := "svmp-lqm"
 	if runtime.GOOS == "windows" {
@@ -771,38 +776,95 @@ func goPerformUpdate() UpdateResult {
 			_ = os.RemoveAll(origSrc)
 			_ = copyDir(backupSrc, origSrc)
 		}
-		_ = os.RemoveAll(backupDir)
 		return UpdateResult{Success: false, Message: fmt.Sprintf("Update failed (%s). Restored previous state.", reason)}
 	}
 
-	// Run git pull
-	pullCmd := exec.Command("git", "pull")
-	pullCmd.Dir = execDir
-	pullOut, err := pullCmd.CombinedOutput()
-	if err != nil {
-		return restoreBackup(fmt.Sprintf("git pull failed: %s", strings.TrimSpace(string(pullOut))))
-	}
-
-	// Run go build
-	buildCmd := exec.Command("go", "build", "-o", binName, ".")
-	buildCmd.Dir = execDir
 	homeDir, _ := os.UserHomeDir()
 	pkgPath := filepath.Join(homeDir, ".local", "lib", "pkgconfig")
 	currentPkg := os.Getenv("PKG_CONFIG_PATH")
-	buildCmd.Env = append(os.Environ(), fmt.Sprintf("PKG_CONFIG_PATH=%s:%s", pkgPath, currentPkg))
+	envPkgConfig := fmt.Sprintf("PKG_CONFIG_PATH=%s:%s", pkgPath, currentPkg)
 
-	buildOut, err := buildCmd.CombinedOutput()
-	if err != nil {
-		return restoreBackup(fmt.Sprintf("go build failed: %s", strings.TrimSpace(string(buildOut))))
+	checkGitCmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
+	checkGitCmd.Dir = execDir
+	isGitRepo := checkGitCmd.Run() == nil
+
+	updatedViaGitPull := false
+	if isGitRepo {
+		pullCmd := exec.Command("git", "pull")
+		pullCmd.Dir = execDir
+		if pullOut, err := pullCmd.CombinedOutput(); err == nil {
+			buildCmd := exec.Command("go", "build", "-o", binName, ".")
+			buildCmd.Dir = execDir
+			buildCmd.Env = append(os.Environ(), envPkgConfig)
+
+			if buildOut, err := buildCmd.CombinedOutput(); err == nil {
+				if _, err := os.Stat(origBin); err == nil {
+					updatedViaGitPull = true
+					revCmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+					revCmd.Dir = execDir
+					if revOut, err := revCmd.CombinedOutput(); err == nil {
+						_ = os.WriteFile(filepath.Join(execDir, ".commit"), []byte(strings.TrimSpace(string(revOut))), 0644)
+					}
+				}
+			} else {
+				log.Println("git pull build failed:", string(buildOut))
+			}
+		} else {
+			log.Println("git pull failed:", string(pullOut))
+		}
 	}
 
-	// Verify binary exists
-	if _, err := os.Stat(origBin); err != nil {
-		return restoreBackup("compiled binary not found after build")
-	}
+	if !updatedViaGitPull {
+		tmpDir, err := os.MkdirTemp("", "svmp-update-*")
+		if err != nil {
+			return restoreBackup(fmt.Sprintf("failed to create temporary directory: %v", err))
+		}
+		defer os.RemoveAll(tmpDir)
 
-	// Clean backup
-	_ = os.RemoveAll(backupDir)
+		cloneCmd := exec.Command("git", "clone", "--depth", "1", "https://github.com/envleaf/svmp-lqm.git", tmpDir)
+		if cloneOut, err := cloneCmd.CombinedOutput(); err != nil {
+			return restoreBackup(fmt.Sprintf("git clone failed: %s", strings.TrimSpace(string(cloneOut))))
+		}
+
+		buildCmd := exec.Command("go", "build", "-o", binName, ".")
+		buildCmd.Dir = tmpDir
+		buildCmd.Env = append(os.Environ(), envPkgConfig)
+
+		if buildOut, err := buildCmd.CombinedOutput(); err != nil {
+			return restoreBackup(fmt.Sprintf("go build failed: %s", strings.TrimSpace(string(buildOut))))
+		}
+
+		newBin := filepath.Join(tmpDir, binName)
+		if _, err := os.Stat(newBin); err != nil {
+			return restoreBackup("compiled binary not found after build")
+		}
+
+		binData, err := os.ReadFile(newBin)
+		if err != nil {
+			return restoreBackup("failed to read newly built binary")
+		}
+
+		// On Linux, writing directly to an executing binary returns ETXTBSY ("text file busy").
+		// Remove existing binary first or write to a temporary file and atomic rename.
+		_ = os.Remove(origBin)
+		if err := os.WriteFile(origBin, binData, 0755); err != nil {
+			return restoreBackup("failed to update binary in installation directory")
+		}
+
+		newSrc := filepath.Join(tmpDir, "src")
+		if _, err := os.Stat(newSrc); err == nil {
+			_ = os.RemoveAll(origSrc)
+			if err := copyDir(newSrc, origSrc); err != nil {
+				return restoreBackup("failed to update src directory")
+			}
+		}
+
+		revCmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+		revCmd.Dir = tmpDir
+		if revOut, err := revCmd.CombinedOutput(); err == nil {
+			_ = os.WriteFile(filepath.Join(execDir, ".commit"), []byte(strings.TrimSpace(string(revOut))), 0644)
+		}
+	}
 
 	return UpdateResult{Success: true, Message: "Update completed successfully!"}
 }

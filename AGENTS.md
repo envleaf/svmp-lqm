@@ -23,7 +23,7 @@ The following features are critical and MUST NOT be broken, altered, or removed 
 ## Versioning Instructions for Agents
 
 <!-- AGENT VERSIONING COMMENT
-Current Nightly Version: v64-nightly
+Current Nightly Version: v66-nightly
 Current Stable Version: v1
 Active Mode: nightly
 
@@ -40,4 +40,5 @@ Rules for Updating Versioning:
    Format (nightly): svmp-lqm v64-nightly
    Format (stable): svmp-lqm v1
 6. For every commit, update the patch notes modal (#patch-notes-modal) in src/player.html with a brief description of what changed in the new version along with the short git commit ID.
+7. User configuration files (svmp-lqm.conf) and playlists directory (playlists/) MUST ALWAYS be preserved and NEVER overwritten during updates unless explicitly requested by an update task.
 -->
