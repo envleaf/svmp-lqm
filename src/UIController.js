@@ -714,6 +714,8 @@ window.UIController = (function() {
         document.getElementById('keybind-modal').style.display = 'none';
         const patchNotesModal = document.getElementById('patch-notes-modal');
         if (patchNotesModal) patchNotesModal.style.display = 'none';
+        const searchHelpModal = document.getElementById('search-help-modal');
+        if (searchHelpModal) searchHelpModal.style.display = 'none';
         document.getElementById('welcome-modal').style.display = 'none';
         document.getElementById('song-info-modal').style.display = 'none';
         const dirBrowserModal = document.getElementById('dir-browser-modal');
@@ -1019,13 +1021,6 @@ window.UIController = (function() {
             });
         }
 
-        const songInfoClose = document.getElementById('song-info-close');
-        if (songInfoClose) {
-            songInfoClose.addEventListener('click', e => {
-                e.preventDefault();
-                document.getElementById('song-info-modal').style.display = 'none';
-            });
-        }
 
         const songInfoQueue = document.getElementById('song-info-queue');
         if (songInfoQueue) {
@@ -1218,6 +1213,17 @@ window.UIController = (function() {
                 e.preventDefault();
                 removeTrackAction(currentInfoIdx);
                 document.getElementById('song-info-modal').style.display = 'none';
+            });
+        }
+
+        const searchHelpBtn = document.getElementById('search-help-btn');
+        if (searchHelpBtn) {
+            searchHelpBtn.addEventListener('click', e => {
+                e.preventDefault();
+                const searchHelpModal = document.getElementById('search-help-modal');
+                if (searchHelpModal) {
+                    searchHelpModal.style.display = searchHelpModal.style.display === 'none' || searchHelpModal.style.display === '' ? 'block' : 'none';
+                }
             });
         }
 

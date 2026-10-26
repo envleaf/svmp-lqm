@@ -14,7 +14,6 @@ window.ListsManager = (function() {
             listsModalContent: document.getElementById('lists-modal-content'),
             listsModalCreate: document.getElementById('lists-modal-create'),
             listsModalBack: document.getElementById('lists-modal-back'),
-            listsModalClose: document.getElementById('lists-modal-close'),
             favBtn: document.getElementById('music-fav')
         };
     }
@@ -233,13 +232,6 @@ window.ListsManager = (function() {
             listsBtn.addEventListener('click', e => {
                 e.preventDefault();
                 openListsModal('main');
-            });
-        }
-
-        if (els.listsModalClose) {
-            els.listsModalClose.addEventListener('click', e => {
-                e.preventDefault();
-                if (els.listsModal) els.listsModal.style.display = 'none';
             });
         }
 
