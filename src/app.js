@@ -29,6 +29,7 @@ document.addEventListener("DOMContentLoaded", function() {
     if (window.UIController) window.UIController.init();
     if (window.VisualEngine) window.VisualEngine.init();
     if (window.ListsManager) window.ListsManager.init();
+    if (window.WindowSync) window.WindowSync.init();
 
     // Session Timer
     let sessionPlaybackTime = 0;

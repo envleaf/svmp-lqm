@@ -112,6 +112,10 @@ window.PlayerController = (function() {
         clearInterval(marqueeInterval);
         let track = pm.getActiveTrack();
 
+        if (window.WindowSync && !window.WindowSync.isReceivingRemote()) {
+            window.WindowSync.broadcastState('SYNC_TRACK_LOAD', { globalIdx: pm.currentGlobalIdx });
+        }
+
         const audioEl = getAudioEl();
         const trackTitleDisplay = getTrackTitleDisplay();
         const timeCurrent = document.getElementById('time-current');
@@ -218,6 +222,13 @@ window.PlayerController = (function() {
         ae.initAudioAPI(cm.state.eq);
         try {
             let p = ae.play();
+            if (window.WindowSync && !window.WindowSync.isReceivingRemote()) {
+                const audioEl = getAudioEl();
+                window.WindowSync.broadcastState('SYNC_PLAYBACK_STATE', {
+                    paused: false,
+                    currentTime: audioEl ? audioEl.currentTime : 0
+                });
+            }
             if (p !== undefined && p !== null) {
                 p.then(() => {
                     consecutiveErrorCount = 0;
@@ -255,6 +266,13 @@ window.PlayerController = (function() {
     function pauseAudio() {
         const toggleBtn = getToggleBtn();
         ae.pause();
+        if (window.WindowSync && !window.WindowSync.isReceivingRemote()) {
+            const audioEl = getAudioEl();
+            window.WindowSync.broadcastState('SYNC_PLAYBACK_STATE', {
+                paused: true,
+                currentTime: audioEl ? audioEl.currentTime : 0
+            });
+        }
         if (toggleBtn) toggleBtn.innerText = ui.t('[play]');
         if (window.VisualEngine) window.VisualEngine.updateVisualizerDisplay();
         stopMarquee();
