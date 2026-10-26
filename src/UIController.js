@@ -86,6 +86,9 @@ window.UIController = (function() {
         });
         ae.applyEQ(cm.state.eq);
         cm.saveEq();
+        if (window.WindowSync && !window.WindowSync.isReceivingRemote()) {
+            window.WindowSync.broadcastState('SYNC_EQ', { eq: cm.state.eq });
+        }
     }
 
     function updateFxUI() {
@@ -240,7 +243,6 @@ window.UIController = (function() {
             pm.toggleQueue(globalIdx);
             refreshIndices();
             if (searchInput && searchInput.value) executeSearch();
-            if (window.PlayerController) window.PlayerController.saveCurrentQueueState();
         } else if (e.button === 0) { // Left click
             if (pm.activePlaylistName) {
                 pm.exitPlaylistQueue();
@@ -345,11 +347,10 @@ window.UIController = (function() {
             let html = ui.t(str);
             ai.forEach((globalIdx, i) => {
                 let track = pl[globalIdx];
+                if (!track) return;
                 let num = String(i + 1).padStart(2, '0');
                 let titleStr = getQueuePrefix(globalIdx) + track.title;
                 let line = `| ${num}. ${titleStr}`;
-                if (line.length > 39) line = line.substring(0, 36) + "...";
-                line = line.padEnd(40, " ") + "|";
                 html += `<div style="display: flex;"><a href="#" class="info-btn" data-idx="${globalIdx}" style="text-decoration: none; margin-right: 5px;">[i]</a><a href="#" class="track-link" data-idx="${globalIdx}" style="display: block; text-decoration: none; flex-grow: 1;">${ui.t(line)}</a></div>`;
             });
             html += ui.t("+---------------------------------------+");
@@ -403,19 +404,66 @@ window.UIController = (function() {
         renderQueueIndex();
     }
 
+    function parseSearchQuery(rawQuery) {
+        let q = rawQuery.trim();
+        if (!q) return { title: '', artist: null, album: null };
+
+        const operandRegex = /(?:^|\s)(a:|b:)/gi;
+        let matches = [];
+        let match;
+        while ((match = operandRegex.exec(q)) !== null) {
+            let operand = match[1].toLowerCase();
+            let operandStart = match.index + (match[0].length - match[1].length);
+            matches.push({ operand: operand, start: operandStart, length: match[1].length });
+        }
+
+        if (matches.length === 0) {
+            return { title: q, artist: null, album: null };
+        }
+
+        let title = q.substring(0, matches[0].start).trim();
+        let artist = null;
+        let album = null;
+
+        for (let i = 0; i < matches.length; i++) {
+            let current = matches[i];
+            let valStart = current.start + current.length;
+            let valEnd = (i + 1 < matches.length) ? matches[i + 1].start : q.length;
+            let val = q.substring(valStart, valEnd).trim();
+
+            if (current.operand === 'a:') {
+                artist = val;
+            } else if (current.operand === 'b:') {
+                album = val;
+            }
+        }
+
+        return { title, artist, album };
+    }
+
     function executeSearch() {
         const searchInput = document.getElementById('search-input');
         const searchResults = document.getElementById('search-results');
         const searchQueueAllBtn = document.getElementById('search-queue-all');
+        const searchClearBtn = document.getElementById('search-clear');
         if (!searchInput || !searchResults) return;
 
-        let query = searchInput.value.toLowerCase().trim();
-        if (!query) {
+        let rawQuery = searchInput.value.trim();
+        if (!rawQuery) {
             searchResults.innerHTML = '';
             matchingSearchResults = [];
             if (searchQueueAllBtn) searchQueueAllBtn.style.display = 'none';
+            if (searchClearBtn) searchClearBtn.style.display = 'none';
             return;
+        } else {
+            if (searchClearBtn) searchClearBtn.style.display = 'inline-block';
         }
+
+        const parsed = parseSearchQuery(rawQuery);
+        let titleQ = parsed.title.toLowerCase();
+        let artistQ = parsed.artist !== null ? parsed.artist.toLowerCase() : null;
+        let albumQ = parsed.album !== null ? parsed.album.toLowerCase() : null;
+
         let html = '';
         let count = 0;
         matchingSearchResults = [];
@@ -425,22 +473,55 @@ window.UIController = (function() {
 
         activeIndices.forEach((globalIdx, localIdx) => {
             let track = playlist[globalIdx];
-            if (track.title.toLowerCase().includes(query)) {
-                matchingSearchResults.push(globalIdx);
-                let num = String(localIdx + 1).padStart(2, '0');
+
+            // Artist filter check
+            if (artistQ !== null) {
+                if (!track.artist || track.artist.trim() === '' || track.artist.trim().toLowerCase() === 'unknown') {
+                    return;
+                }
+                if (!track.artist.toLowerCase().includes(artistQ)) {
+                    return;
+                }
+            }
+
+            // Album filter check
+            if (albumQ !== null) {
+                if (!track.album || track.album.trim() === '' || track.album.trim().toLowerCase() === 'unknown') {
+                    return;
+                }
+                if (!track.album.toLowerCase().includes(albumQ)) {
+                    return;
+                }
+            }
+
+            // Title filter check
+            if (titleQ.length > 0) {
+                if (!track.title.toLowerCase().includes(titleQ)) {
+                    return;
+                }
+            }
+
+            matchingSearchResults.push(globalIdx);
+            let num = String(localIdx + 1).padStart(2, '0');
+            let qPrefix = getQueuePrefix(globalIdx);
+
+            let highlightedTitle;
+            if (titleQ.length > 0) {
                 let titleLower = track.title.toLowerCase();
-                let matchStart = titleLower.indexOf(query);
-                let matchEnd = matchStart + query.length;
+                let matchStart = titleLower.indexOf(titleQ);
+                let matchEnd = matchStart + titleQ.length;
 
                 let beforeMatch = track.title.substring(0, matchStart);
                 let matchText = track.title.substring(matchStart, matchEnd);
                 let afterMatch = track.title.substring(matchEnd);
-                let qPrefix = getQueuePrefix(globalIdx);
 
-                let highlightedTitle = `${ui.t(qPrefix)}${ui.t(beforeMatch)}<span style="background-color: var(--text-color); color: var(--bg-color);">${ui.t(matchText)}</span>${ui.t(afterMatch)}`;
-                html += `<div style="display: flex;"><a href="#" class="info-btn" data-idx="${globalIdx}" style="text-decoration: none; margin-right: 5px;">[i]</a><a href="#" class="search-result-link track-link" data-idx="${globalIdx}" style="display: block; text-decoration: none; flex-grow: 1;">| ${num}. ${highlightedTitle}</a></div>`;
-                count++;
+                highlightedTitle = `${ui.t(qPrefix)}${ui.t(beforeMatch)}<span style="background-color: var(--text-color); color: var(--bg-color);">${ui.t(matchText)}</span>${ui.t(afterMatch)}`;
+            } else {
+                highlightedTitle = `${ui.t(qPrefix)}${ui.t(track.title)}`;
             }
+
+            html += `<div style="display: flex;"><a href="#" class="info-btn" data-idx="${globalIdx}" style="text-decoration: none; margin-right: 5px;">[i]</a><a href="#" class="search-result-link track-link" data-idx="${globalIdx}" style="display: block; text-decoration: none; flex-grow: 1;">| ${num}. ${highlightedTitle}</a></div>`;
+            count++;
         });
 
         if (count === 0) {
@@ -503,14 +584,22 @@ window.UIController = (function() {
         document.getElementById('song-info-album').innerText = track.album || "Unknown";
         document.getElementById('song-info-bitrate').innerText = "Unknown";
 
+        const playFromBtn = document.getElementById('song-info-play-from');
+        const goToBtn = document.getElementById('song-info-go-to');
         const playAlbumBtn = document.getElementById('song-info-play-album');
         const playArtistBtn = document.getElementById('song-info-play-artist');
+        const gotoAlbumBtn = document.getElementById('song-info-goto-album');
+        const gotoArtistBtn = document.getElementById('song-info-goto-artist');
 
         let hasAlbum = track.album && track.album.trim() !== '' && track.album.toLowerCase() !== 'unknown';
         let hasArtist = track.artist && track.artist.trim() !== '' && track.artist.toLowerCase() !== 'unknown';
 
-        if (playAlbumBtn) playAlbumBtn.style.display = hasAlbum ? 'inline-block' : 'none';
-        if (playArtistBtn) playArtistBtn.style.display = hasArtist ? 'inline-block' : 'none';
+        if (playFromBtn) playFromBtn.style.display = (hasAlbum || hasArtist) ? 'inline-block' : 'none';
+        if (goToBtn) goToBtn.style.display = (hasAlbum || hasArtist) ? 'inline-block' : 'none';
+        if (playAlbumBtn) playAlbumBtn.style.display = 'none';
+        if (playArtistBtn) playArtistBtn.style.display = 'none';
+        if (gotoAlbumBtn) gotoAlbumBtn.style.display = 'none';
+        if (gotoArtistBtn) gotoArtistBtn.style.display = 'none';
 
         if (infoArt) infoArt.style.display = 'none';
         if (infoArtPlaceholder) infoArtPlaceholder.style.display = 'flex';
@@ -540,7 +629,10 @@ window.UIController = (function() {
                         if (tag.tags.album) {
                             document.getElementById('song-info-album').innerText = tag.tags.album;
                             track.album = tag.tags.album;
-                            if (playAlbumBtn) playAlbumBtn.style.display = 'inline-block';
+                            let hasAlbumNow = true;
+                            let hasArtistNow = track.artist && track.artist.trim() !== '' && track.artist.toLowerCase() !== 'unknown';
+                            if (playFromBtn && playFromBtn.style.display !== 'none') playFromBtn.style.display = 'inline-block';
+                            if (goToBtn && goToBtn.style.display !== 'none') goToBtn.style.display = 'inline-block';
                         }
 
                         if (tag.tags.picture) {
@@ -625,6 +717,8 @@ window.UIController = (function() {
         document.getElementById('keybind-modal').style.display = 'none';
         const patchNotesModal = document.getElementById('patch-notes-modal');
         if (patchNotesModal) patchNotesModal.style.display = 'none';
+        const searchHelpModal = document.getElementById('search-help-modal');
+        if (searchHelpModal) searchHelpModal.style.display = 'none';
         document.getElementById('welcome-modal').style.display = 'none';
         document.getElementById('song-info-modal').style.display = 'none';
         const dirBrowserModal = document.getElementById('dir-browser-modal');
@@ -712,6 +806,7 @@ window.UIController = (function() {
         const volBar = document.getElementById('vol-bar');
         const asciiBar = document.getElementById('ascii-bar');
         const searchInput = document.getElementById('search-input');
+        const searchClearBtn = document.getElementById('search-clear');
         const playlistInput = document.getElementById('playlist-input');
         const nowPlayingLabel = document.getElementById('now-playing-label');
 
@@ -749,7 +844,6 @@ window.UIController = (function() {
                 pm.isShuffle = !pm.isShuffle;
                 shuffleBtn.innerText = pm.isShuffle ? ui.t('[shuffle (x)]') : ui.t('[shuffle ( )]');
                 renderQueueIndex();
-                if (window.PlayerController) window.PlayerController.saveCurrentQueueState();
             });
         }
 
@@ -930,28 +1024,6 @@ window.UIController = (function() {
             });
         }
 
-        const songInfoClose = document.getElementById('song-info-close');
-        if (songInfoClose) {
-            songInfoClose.addEventListener('click', e => {
-                e.preventDefault();
-                document.getElementById('song-info-modal').style.display = 'none';
-            });
-        }
-
-        const songInfoPlay = document.getElementById('song-info-play');
-        if (songInfoPlay) {
-            songInfoPlay.addEventListener('click', e => {
-                e.preventDefault();
-                if (currentInfoIdx !== -1) {
-                    pm.playTrackByGlobalIndex(currentInfoIdx);
-                    window.PlayerController.loadTrack();
-                    window.PlayerController.playAudio();
-                    refreshIndices();
-                    if (searchInput && searchInput.value) executeSearch();
-                    document.getElementById('song-info-modal').style.display = 'none';
-                }
-            });
-        }
 
         const songInfoQueue = document.getElementById('song-info-queue');
         if (songInfoQueue) {
@@ -964,7 +1036,94 @@ window.UIController = (function() {
             });
         }
 
+        const playFromBtn = document.getElementById('song-info-play-from');
+        const goToBtn = document.getElementById('song-info-go-to');
         const songInfoPlayAlbum = document.getElementById('song-info-play-album');
+        const songInfoPlayArtist = document.getElementById('song-info-play-artist');
+        const gotoArtistBtn = document.getElementById('song-info-goto-artist');
+        const gotoAlbumBtn = document.getElementById('song-info-goto-album');
+
+        if (playFromBtn) {
+            playFromBtn.addEventListener('click', e => {
+                e.preventDefault();
+                if (currentInfoIdx === -1) return;
+                let track = pm.playlist[currentInfoIdx];
+                if (!track) return;
+                let hasAlbum = track.album && track.album.trim() !== '' && track.album.toLowerCase() !== 'unknown';
+                let hasArtist = track.artist && track.artist.trim() !== '' && track.artist.toLowerCase() !== 'unknown';
+
+                playFromBtn.style.display = 'none';
+                if (songInfoPlayArtist) songInfoPlayArtist.style.display = hasArtist ? 'inline-block' : 'none';
+                if (songInfoPlayAlbum) songInfoPlayAlbum.style.display = hasAlbum ? 'inline-block' : 'none';
+
+                if (goToBtn) goToBtn.style.display = (hasAlbum || hasArtist) ? 'inline-block' : 'none';
+                if (gotoArtistBtn) gotoArtistBtn.style.display = 'none';
+                if (gotoAlbumBtn) gotoAlbumBtn.style.display = 'none';
+            });
+        }
+
+        if (goToBtn) {
+            goToBtn.addEventListener('click', e => {
+                e.preventDefault();
+                if (currentInfoIdx === -1) return;
+                let track = pm.playlist[currentInfoIdx];
+                if (!track) return;
+                let hasAlbum = track.album && track.album.trim() !== '' && track.album.toLowerCase() !== 'unknown';
+                let hasArtist = track.artist && track.artist.trim() !== '' && track.artist.toLowerCase() !== 'unknown';
+
+                goToBtn.style.display = 'none';
+                if (gotoArtistBtn) gotoArtistBtn.style.display = hasArtist ? 'inline-block' : 'none';
+                if (gotoAlbumBtn) gotoAlbumBtn.style.display = hasAlbum ? 'inline-block' : 'none';
+
+                if (playFromBtn) playFromBtn.style.display = (hasAlbum || hasArtist) ? 'inline-block' : 'none';
+                if (songInfoPlayArtist) songInfoPlayArtist.style.display = 'none';
+                if (songInfoPlayAlbum) songInfoPlayAlbum.style.display = 'none';
+            });
+        }
+
+        function triggerSearchQuery(queryStr) {
+            document.getElementById('song-info-modal').style.display = 'none';
+            const searchBox = document.getElementById('search-box');
+            const searchBtn = document.getElementById('music-search');
+            const searchInput = document.getElementById('search-input');
+
+            if (searchBox && searchBox.style.display !== 'block') {
+                if (searchBtn) {
+                    searchBtn.click();
+                }
+            }
+
+            if (searchInput) {
+                searchInput.value = queryStr;
+                executeSearch();
+                setTimeout(() => searchInput.focus(), 10);
+            }
+        }
+
+        if (gotoArtistBtn) {
+            gotoArtistBtn.addEventListener('click', e => {
+                e.preventDefault();
+                if (currentInfoIdx !== -1) {
+                    let track = pm.playlist[currentInfoIdx];
+                    if (track && track.artist && track.artist.toLowerCase() !== 'unknown') {
+                        triggerSearchQuery(`a: ${track.artist.toLowerCase().trim()}`);
+                    }
+                }
+            });
+        }
+
+        if (gotoAlbumBtn) {
+            gotoAlbumBtn.addEventListener('click', e => {
+                e.preventDefault();
+                if (currentInfoIdx !== -1) {
+                    let track = pm.playlist[currentInfoIdx];
+                    if (track && track.album && track.album.toLowerCase() !== 'unknown') {
+                        triggerSearchQuery(`b: ${track.album.toLowerCase().trim()}`);
+                    }
+                }
+            });
+        }
+
         if (songInfoPlayAlbum) {
             songInfoPlayAlbum.addEventListener('click', e => {
                 e.preventDefault();
@@ -1001,7 +1160,6 @@ window.UIController = (function() {
             });
         }
 
-        const songInfoPlayArtist = document.getElementById('song-info-play-artist');
         if (songInfoPlayArtist) {
             songInfoPlayArtist.addEventListener('click', e => {
                 e.preventDefault();
@@ -1061,6 +1219,26 @@ window.UIController = (function() {
             });
         }
 
+        const searchHelpBtn = document.getElementById('search-help-btn');
+        if (searchHelpBtn) {
+            searchHelpBtn.addEventListener('click', e => {
+                e.preventDefault();
+                const searchHelpModal = document.getElementById('search-help-modal');
+                if (searchHelpModal) {
+                    searchHelpModal.style.display = searchHelpModal.style.display === 'none' || searchHelpModal.style.display === '' ? 'block' : 'none';
+                }
+            });
+        }
+
+        if (searchClearBtn) {
+            searchClearBtn.addEventListener('click', e => {
+                e.preventDefault();
+                if (searchInput) searchInput.value = '';
+                executeSearch();
+                if (searchInput) searchInput.focus();
+            });
+        }
+
         const searchQueueAllBtn = document.getElementById('search-queue-all');
         if (searchQueueAllBtn) {
             searchQueueAllBtn.addEventListener('click', e => {
@@ -1088,6 +1266,9 @@ window.UIController = (function() {
         if (searchInput) {
             let searchDebounceTimer;
             searchInput.addEventListener('input', () => {
+                if (searchClearBtn) {
+                    searchClearBtn.style.display = searchInput.value.length > 0 ? 'inline-block' : 'none';
+                }
                 clearTimeout(searchDebounceTimer);
                 searchDebounceTimer = setTimeout(executeSearch, 250);
             });
@@ -1162,12 +1343,6 @@ window.UIController = (function() {
                         if (window.updateTimebarDisplay) window.updateTimebarDisplay();
                     } else if (opt === 'fullscreen') {
                         syncFullscreenState(val);
-                    } else if (opt === 'rememberLastQueue') {
-                        if (val === true) {
-                            if (window.PlayerController) window.PlayerController.saveCurrentQueueState();
-                        } else if (val === false) {
-                            cm.saveQueueState(null);
-                        }
                     }
                 }
                 updateOptionsUI();
@@ -1202,6 +1377,9 @@ window.UIController = (function() {
 
                 cm.saveFx();
                 updateFxUI();
+                if (window.WindowSync && !window.WindowSync.isReceivingRemote()) {
+                    window.WindowSync.broadcastState('SYNC_FX', { fx: cm.state.fx, isUwu: cm.state.isUwu, clockState: cm.state.clockState, isSway: cm.state.isSway, isMobile: cm.state.isMobile });
+                }
             });
         });
 
@@ -1441,6 +1619,18 @@ window.UIController = (function() {
             if (e.ctrlKey || e.metaKey || e.altKey) return;
 
             switch (e.code) {
+                case 'KeyN':
+                    e.preventDefault();
+                    if (e.shiftKey) {
+                        if (window.goCloseCurrentWindow) {
+                            window.goCloseCurrentWindow();
+                        }
+                    } else {
+                        if (window.goOpenNewWindow) {
+                            window.goOpenNewWindow();
+                        }
+                    }
+                    break;
                 case 'Space':
                     e.preventDefault();
                     if (isScpMode) break;

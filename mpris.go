@@ -27,62 +27,46 @@ type mprisPlayer struct {
 }
 
 func (p *mprisPlayer) Next() *dbus.Error {
-	w.Dispatch(func() {
-		w.Eval("if(window.PlayerController) window.PlayerController.next();")
-	})
+	winMgr.BroadcastJS("if(window.PlayerController) window.PlayerController.next();")
 	return nil
 }
 
 func (p *mprisPlayer) Previous() *dbus.Error {
-	w.Dispatch(func() {
-		w.Eval("if(window.PlayerController) window.PlayerController.prev();")
-	})
+	winMgr.BroadcastJS("if(window.PlayerController) window.PlayerController.prev();")
 	return nil
 }
 
 func (p *mprisPlayer) Pause() *dbus.Error {
-	w.Dispatch(func() {
-		w.Eval("if(window.PlayerController) window.PlayerController.pauseAudio();")
-	})
+	winMgr.BroadcastJS("if(window.PlayerController) window.PlayerController.pauseAudio();")
 	return nil
 }
 
 func (p *mprisPlayer) PlayPause() *dbus.Error {
-	w.Dispatch(func() {
-		w.Eval("if(window.PlayerController && window.PlayerController.togglePlay) window.PlayerController.togglePlay(); else if (window.PlayerController) { if (document.getElementById('audio-element').paused) window.PlayerController.playAudio(); else window.PlayerController.pauseAudio(); }")
-	})
+	winMgr.BroadcastJS("if(window.PlayerController && window.PlayerController.togglePlay) window.PlayerController.togglePlay(); else if (window.PlayerController) { if (document.getElementById('audio-element').paused) window.PlayerController.playAudio(); else window.PlayerController.pauseAudio(); }")
 	return nil
 }
 
 func (p *mprisPlayer) Stop() *dbus.Error {
-	w.Dispatch(func() {
-		w.Eval("if(window.PlayerController) window.PlayerController.pauseAudio();")
-	})
+	winMgr.BroadcastJS("if(window.PlayerController) window.PlayerController.pauseAudio();")
 	return nil
 }
 
 func (p *mprisPlayer) Play() *dbus.Error {
-	w.Dispatch(func() {
-		w.Eval("if(window.PlayerController) window.PlayerController.playAudio();")
-	})
+	winMgr.BroadcastJS("if(window.PlayerController) window.PlayerController.playAudio();")
 	return nil
 }
 
 func (p *mprisPlayer) Seek(offset int64) *dbus.Error {
 	// offset in microseconds
 	seconds := float64(offset) / 1000000.0
-	w.Dispatch(func() {
-		w.Eval(fmt.Sprintf("if(window.PlayerController && window.PlayerController.seekRelative) window.PlayerController.seekRelative(%f); else if (window.PlayerController) { let a = document.getElementById('audio-element'); if(a) window.PlayerController.seek(a.currentTime + %f); }", seconds, seconds))
-	})
+	winMgr.BroadcastJS(fmt.Sprintf("if(window.PlayerController && window.PlayerController.seekRelative) window.PlayerController.seekRelative(%f); else if (window.PlayerController) { let a = document.getElementById('audio-element'); if(a) window.PlayerController.seek(a.currentTime + %f); }", seconds, seconds))
 	return nil
 }
 
 func (p *mprisPlayer) SetPosition(trackId dbus.ObjectPath, position int64) *dbus.Error {
 	// position in microseconds
 	seconds := float64(position) / 1000000.0
-	w.Dispatch(func() {
-		w.Eval(fmt.Sprintf("if(window.PlayerController) window.PlayerController.seek(%f);", seconds))
-	})
+	winMgr.BroadcastJS(fmt.Sprintf("if(window.PlayerController) window.PlayerController.seek(%f);", seconds))
 	return nil
 }
 
@@ -134,9 +118,7 @@ func initMpris() {
 			}, false, prop.EmitTrue, nil},
 			"Volume": {1.0, true, prop.EmitTrue, func(c *prop.Change) *dbus.Error {
 				vol := c.Value.(float64)
-				w.Dispatch(func() {
-					w.Eval(fmt.Sprintf("if(window.AudioEngine) window.AudioEngine.setVolume(%f);", vol))
-				})
+				winMgr.BroadcastJS(fmt.Sprintf("if(window.AudioEngine) window.AudioEngine.setVolume(%f);", vol))
 				return nil
 			}},
 			"Position":      {int64(0), false, prop.EmitFalse, nil},

@@ -31,12 +31,7 @@ window.PlayerController = (function() {
         let trackNumDisplay = pm.currentIndex + 1;
         let totalDisplay = pm.activeIndices.length;
 
-        let displayStr = fullTitleString.substring(0, 30);
-        if (fullTitleString.length > 30) {
-            displayStr += "...";
-        } else {
-            displayStr = fullTitleString;
-        }
+        let displayStr = fullTitleString;
 
         trackTitleDisplay.innerHTML = `${ui.t(displayStr)} <span style="color: var(--prompt-color); font-size: 0.9em;">[${trackNumDisplay}/${totalDisplay}]</span>`;
     }
@@ -113,34 +108,13 @@ window.PlayerController = (function() {
         return track;
     }
 
-    function saveCurrentQueueState() {
-        if (!cm.state.options || cm.state.options.rememberLastQueue === false) return;
-        const activeTrack = pm.getActiveTrack();
-        const audioEl = getAudioEl();
-        if (!activeTrack) {
-            cm.saveQueueState(null);
-            return;
-        }
-
-        const qState = {
-            currentTrackPath: activeTrack.originalPath || null,
-            currentTime: (audioEl ? audioEl.currentTime : 0) || 0,
-            manualQueuePaths: pm.manualQueue.map(idx => pm.playlist[idx]?.originalPath).filter(Boolean),
-            upcomingQueuePaths: pm.upcomingQueue.map(idx => pm.playlist[idx]?.originalPath).filter(Boolean),
-            historyPaths: pm.history.map(idx => pm.playlist[idx]?.originalPath).filter(Boolean),
-            activeIndicesPaths: pm.isCustomMode ? pm.activeIndices.map(idx => pm.playlist[idx]?.originalPath).filter(Boolean) : null,
-            isShuffle: pm.isShuffle,
-            isCustomMode: pm.isCustomMode,
-            activePlaylistName: pm.activePlaylistName
-        };
-
-        cm.saveQueueState(qState);
-    }
-
     function loadTrack() {
         clearInterval(marqueeInterval);
         let track = pm.getActiveTrack();
-        saveCurrentQueueState();
+
+        if (window.WindowSync && !window.WindowSync.isReceivingRemote()) {
+            window.WindowSync.broadcastState('SYNC_TRACK_LOAD', { globalIdx: pm.currentGlobalIdx });
+        }
 
         const audioEl = getAudioEl();
         const trackTitleDisplay = getTrackTitleDisplay();
@@ -152,7 +126,7 @@ window.PlayerController = (function() {
         if (track && cm.state.options && cm.state.options.trackNotif) {
             let notifStr = `${track.title}`;
             if (track.artist) notifStr = `${track.artist} - ${track.title}`;
-            ui.showNotification(`now playing: ${notifStr}`);
+            ui.showNotification(`now playing: ${notifStr}`, null, 'track');
         }
 
         let initialArtUrl = track ? (track.onlineArtUrl || '') : '';
@@ -248,6 +222,13 @@ window.PlayerController = (function() {
         ae.initAudioAPI(cm.state.eq);
         try {
             let p = ae.play();
+            if (window.WindowSync && !window.WindowSync.isReceivingRemote()) {
+                const audioEl = getAudioEl();
+                window.WindowSync.broadcastState('SYNC_PLAYBACK_STATE', {
+                    paused: false,
+                    currentTime: audioEl ? audioEl.currentTime : 0
+                });
+            }
             if (p !== undefined && p !== null) {
                 p.then(() => {
                     consecutiveErrorCount = 0;
@@ -285,11 +266,17 @@ window.PlayerController = (function() {
     function pauseAudio() {
         const toggleBtn = getToggleBtn();
         ae.pause();
+        if (window.WindowSync && !window.WindowSync.isReceivingRemote()) {
+            const audioEl = getAudioEl();
+            window.WindowSync.broadcastState('SYNC_PLAYBACK_STATE', {
+                paused: true,
+                currentTime: audioEl ? audioEl.currentTime : 0
+            });
+        }
         if (toggleBtn) toggleBtn.innerText = ui.t('[play]');
         if (window.VisualEngine) window.VisualEngine.updateVisualizerDisplay();
         stopMarquee();
         if (window.goUpdateMprisStatus) window.goUpdateMprisStatus("Paused");
-        saveCurrentQueueState();
     }
 
     function nextTrack(isUserAction = false) {
@@ -522,8 +509,7 @@ window.PlayerController = (function() {
         uploadFiles: (toPlaylist) => uploadFiles(toPlaylist),
         startMarquee,
         stopMarquee,
-        fetchOnlineTrackMetadata,
-        saveCurrentQueueState
+        fetchOnlineTrackMetadata
     };
 
     return controller;

@@ -334,7 +334,6 @@
 #fetch-display div {
     white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 #fetch-close-btn {
@@ -484,26 +483,24 @@
 |  [4]       toggle audio mute          |
 |  [6]       toggle deckmode (sway)     |
 |                                       |
+|  [N]       open new window            |
+|  [Shift+N] close current window       |
 |  [Esc]     close all menus/modals     |
 |  [/]       toggle this menu           |
 |                                       |
-|  <a href="#" id="version-patch-link" style="text-decoration: none;">svmp-lqm v67-nightly</a>               |
+|  <a href="#" id="version-patch-link" style="text-decoration: none;">svmp-lqm v70-nightly</a>               |
 +---------------------------------------+</pre>
 </div>
 
 <div id="patch-notes-modal" class="overlay-modal focus-hide">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0; color: var(--text-color);">
-+-- patch notes (v67-nightly) -----------+
-|  commit: 3590023                       |
++-- patch notes (v70-nightly) -----------+
 |                                       |
-|  - Fixed "remember last queue" option |
-|    not restoring queue on startup.    |
-|  - Persisted full queue state,        |
-|    including shuffle, custom queues,  |
-|    manual queue, history, & position. |
-|  - Auto-clears queue state if target  |
-|    directory is unreachable.          |
+|  - Added multi-window support:        |
+|    Press [N] to open a new window     |
+|    Press [Shift+N] to close current.  |
+|  - Real-time cross-window sync.       |
 |                                       |
 +---------------------------------------+</pre>
 </div>
@@ -541,7 +538,7 @@
     </div>
 
     <p style="margin-top: 0.3em; margin-bottom: 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center;" id="action-row" class="focus-hide">
-        <a href="#" id="music-index" class="menu-toggle" data-target="index-box">[index +]</a>
+        <a href="#" id="music-index" class="menu-toggle" data-target="index-box">[library +]</a>
         <a href="#" id="music-queue" class="menu-toggle" data-target="queue-box">[queue +]</a>
         <a href="#" id="music-playlist" class="menu-toggle" data-target="playlist-box" style="display: none;">[playlist +]</a>
         <a href="#" id="music-search" class="menu-toggle" data-target="search-box">[search +]</a>
@@ -553,7 +550,7 @@
 
 <div id="index-box" class="menu-box scrollable focus-hide">
 <a href="#" class="modal-close-x">[ x ]</a>
-<pre style="margin: 0;">+-- global index -----------------------+</pre>
+<pre style="margin: 0;">+-- music library ----------------------+</pre>
     <div id="index-results" style="margin-top: 0.5em; margin-bottom: 0; line-height: 1.8;"></div>
 </div>
 
@@ -579,9 +576,10 @@
 
 <div id="search-box" class="menu-box scrollable focus-hide">
 <a href="#" class="modal-close-x">[ x ]</a>
-<pre style="margin: 0;">+-- track search -----------------------+</pre>
+<pre style="margin: 0; display: inline-block;">+-- track search</pre> <a href="#" id="search-help-btn" style="font-size: 0.8em; text-decoration: none;">[?]</a><pre style="margin: 0; display: inline-block;"> -----------------------+</pre>
     <div style="display: flex; align-items: center; gap: 10px; margin-top: 0.5em; margin-bottom: 10px;">
         <input type="text" id="search-input" placeholder="search active queue..." spellcheck="false" autocomplete="off" style="margin-bottom: 0; flex-grow: 1;">
+        <a href="#" id="search-clear" style="display: none; white-space: nowrap; text-decoration: none;">[ clear ]</a>
         <a href="#" id="search-queue-all" style="display: none; white-space: nowrap; text-decoration: none;">[ queue all ]</a>
     </div>
     <div id="search-results" style="margin-top: 0.5em; margin-bottom: 0; line-height: 1.8;"></div>
@@ -739,12 +737,6 @@
                 <a href="#" class="opt-toggle" data-opt="autoPlayAtStartup" data-val="false">[x] off</a>
             </div>
 
-            <strong style="color: var(--text-color); margin-top: 10px;">remember last queue</strong>
-            <div>
-                <a href="#" class="opt-toggle" data-opt="rememberLastQueue" data-val="true">[x] on</a>
-                <a href="#" class="opt-toggle" data-opt="rememberLastQueue" data-val="false">[ ] off</a>
-            </div>
-
             <!-- ALWAYS KEEP AT BOTTOM OF THIRD COLUMN -->
             <a href="#" id="opt-check-updates" style="margin-top: 10px; display: inline-block;">[ Check for Updates ]</a>
         </div>
@@ -779,20 +771,22 @@
         <div id="song-info-artwork-placeholder" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">no art</div>
     </div>
     <div style="display: flex; flex-direction: column; justify-content: center; color: var(--text-color); overflow: hidden;">
-        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><strong>title:</strong>   <span id="song-info-title">...</span></div>
-        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><strong>artist:</strong>  <span id="song-info-artist">...</span></div>
-        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><strong>album:</strong>   <span id="song-info-album">...</span></div>
-        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><strong>bitrate:</strong> <span id="song-info-bitrate">...</span></div>
+        <div><strong>title:</strong>   <span id="song-info-title">...</span></div>
+        <div><strong>artist:</strong>  <span id="song-info-artist">...</span></div>
+        <div><strong>album:</strong>   <span id="song-info-album">...</span></div>
+        <div><strong>bitrate:</strong> <span id="song-info-bitrate">...</span></div>
     </div>
 </div>
 <div style="display: flex; gap: 15px; flex-wrap: wrap; color: var(--text-color);">
-    <a href="#" id="song-info-play">[play]</a>
     <a href="#" id="song-info-queue">[add to queue]</a>
-    <a href="#" id="song-info-play-album" style="display: none;">[play from album]</a>
+    <a href="#" id="song-info-play-from">[play from]</a>
     <a href="#" id="song-info-play-artist" style="display: none;">[play from artist]</a>
+    <a href="#" id="song-info-play-album" style="display: none;">[play from album]</a>
+    <a href="#" id="song-info-go-to">[go to]</a>
+    <a href="#" id="song-info-goto-artist" style="display: none;">[go to artist]</a>
+    <a href="#" id="song-info-goto-album" style="display: none;">[go to album]</a>
     <a href="#" id="song-info-add-list">[add to list]</a>
     <a href="#" id="song-info-remove" style="color: #ff5555;">[remove]</a>
-    <a href="#" id="song-info-close">[close]</a>
 </div>
 </div>
 
@@ -818,6 +812,25 @@
     </div>
 </div>
 
+<!-- Search Help Modal -->
+<div id="search-help-modal" class="overlay-modal focus-hide">
+<a href="#" class="modal-close-x">[ x ]</a>
+<pre style="margin: 0; color: var(--text-color);">
++-- search operands help ---------------+
+|                                       |
+|  use operands to filter search:       |
+|                                       |
+|  a:  filter by artist                 |
+|      e.g. a: daft punk                |
+|                                       |
+|  b:  filter by album                  |
+|      e.g. b: discovery                |
+|                                       |
+|  operands can be combined:            |
+|  e.g. one more time a: daft b: disco  |
++---------------------------------------+</pre>
+</div>
+
 <!-- Lists Modal -->
 <div id="lists-modal" class="overlay-modal" style="display: none; padding: 20px; z-index: 10002; text-align: left; background: var(--bg-color); border: 1px solid var(--text-color); box-shadow: 4px 4px 0 var(--text-color); min-width: 400px; max-height: 80vh; overflow: hidden; flex-direction: column;">
     <a href="#" class="modal-close-x">[ x ]</a>
@@ -826,7 +839,6 @@
         <div>
             <a href="#" id="lists-modal-create" style="margin-right: 10px;">[create]</a>
             <a href="#" id="lists-modal-back" style="display: none; margin-right: 10px;">[back]</a>
-            <a href="#" id="lists-modal-close">[close]</a>
         </div>
     </div>
     <div id="lists-modal-content" style="flex-grow: 1; overflow-y: auto; border: 1px dashed var(--prompt-color); padding: 10px; color: var(--text-color); line-height: 1.8;">
@@ -844,6 +856,7 @@
 <script src="StatMonitor.js"></script>
 <script src="PlayerController.js"></script>
 <script src="UIController.js"></script>
+<script src="WindowSync.js"></script>
 <script src="cmd.js"></script>
 <script src="update.js"></script>
 <script src="app.js"></script>
