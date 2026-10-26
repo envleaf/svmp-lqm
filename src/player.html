@@ -357,6 +357,28 @@
     }
 }
 
+/* Modular UI & Hide Controls */
+body.title-pos-top #music-ui > p:first-child {
+    position: fixed;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 99999;
+    margin: 0;
+    pointer-events: auto;
+    text-align: center;
+    width: auto;
+    max-width: 90vw;
+}
+
+body.hide-controls-mode .music-controls,
+body.hide-controls-mode #ascii-progress-container,
+body.hide-controls-mode #playlist-status-text,
+body.hide-controls-mode #action-row,
+body.hide-controls-mode .menu-box:not(.overlay-modal) {
+    display: none !important;
+}
+
 /* Notification System */
 #notification-container {
     position: fixed;
@@ -488,19 +510,21 @@
 |  [Esc]     close all menus/modals     |
 |  [/]       toggle this menu           |
 |                                       |
-|  <a href="#" id="version-patch-link" style="text-decoration: none;">svmp-lqm v70-nightly</a>               |
+|  <a href="#" id="version-patch-link" style="text-decoration: none;">svmp-lqm v71-nightly</a>               |
 +---------------------------------------+</pre>
 </div>
 
 <div id="patch-notes-modal" class="overlay-modal focus-hide">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0; color: var(--text-color);">
-+-- patch notes (v70-nightly) -----------+
++-- patch notes (v71-nightly) -----------+
 |                                       |
-|  - Added multi-window support:        |
-|    Press [N] to open a new window     |
-|    Press [Shift+N] to close current.  |
-|  - Real-time cross-window sync.       |
+|  - Modular UI & Title Position:       |
+|    Toggle song title position between |
+|    default & top in [opt +].          |
+|  - Hide Player Controls option:       |
+|    Hide controls via [opt +], unhide  |
+|    by left-clicking anywhere.         |
 |                                       |
 +---------------------------------------+</pre>
 </div>
@@ -698,6 +722,12 @@
             <strong style="color: var(--text-color); margin-top: 10px;">notification position</strong>
             <a href="#" id="opt-notif-pos">[pos: topleft]</a>
             
+            <strong style="color: var(--text-color); margin-top: 10px;">title position</strong>
+            <a href="#" id="opt-title-pos">[title pos: default]</a>
+
+            <strong style="color: var(--text-color); margin-top: 10px;">player controls</strong>
+            <a href="#" id="opt-hide-controls">[hide controls]</a>
+
             <strong style="color: var(--text-color); margin-top: 10px;">song change notifications</strong>
             <div>
                 <a href="#" class="opt-toggle" data-opt="trackNotif" data-val="true">[x] on</a>
