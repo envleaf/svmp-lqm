@@ -73,10 +73,8 @@ window.PlaylistManager = (function() {
         if (!cleanName && trackData.originalName) {
              cleanName = trackData.originalName.replace(/\.[^/.]+$/, "");
         }
-        if (cleanName && cleanName.length > 35) cleanName = cleanName.substring(0, 32) + "...";
 
         let parsedTitle = trackData.artist ? `${trackData.artist} - ${cleanName}` : cleanName;
-        if (parsedTitle && parsedTitle.length > 35) parsedTitle = parsedTitle.substring(0, 32) + "...";
 
         let newTrack = {
             file: null,
@@ -110,7 +108,6 @@ window.PlaylistManager = (function() {
         Array.from(files).forEach((file, index) => {
             const fileURL = URL.createObjectURL(file);
             let cleanName = file.name.replace(/\.[^/.]+$/, "");
-            if (cleanName.length > 35) cleanName = cleanName.substring(0, 32) + "...";
 
             let trackData = { file: file, src: fileURL, title: cleanName, artist: '', album: '' };
             let addedIndex = playlist.length;
@@ -122,7 +119,6 @@ window.PlaylistManager = (function() {
                     onSuccess: function(tag) {
                         if (tag.tags.title) {
                             let parsedTitle = tag.tags.artist ? `${tag.tags.artist} - ${tag.tags.title}` : tag.tags.title;
-                            if (parsedTitle.length > 35) parsedTitle = parsedTitle.substring(0, 32) + "...";
                             playlist[addedIndex].title = parsedTitle;
                             playlist[addedIndex].artist = tag.tags.artist || '';
                         }

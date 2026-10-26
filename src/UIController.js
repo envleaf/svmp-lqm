@@ -189,6 +189,13 @@ window.UIController = (function() {
             }
         }
 
+        let titlePos = (cm.state.options && cm.state.options.titlePosition) ? cm.state.options.titlePosition : 'default';
+        document.body.classList.toggle('title-pos-top', titlePos === 'top');
+        const titlePosBtn = document.getElementById('opt-title-pos');
+        if (titlePosBtn) {
+            titlePosBtn.innerText = ui.t(`[title pos: ${titlePos}]`);
+        }
+
         if (window.VisualEngine) window.VisualEngine.updateExpieUI();
 
         if (cm.state.isMobile) {
@@ -1013,6 +1020,46 @@ window.UIController = (function() {
                 cm.state.options.notifPosition = order[nextIdx];
                 cm.saveOptions();
                 updateOptionsUI();
+            });
+        }
+
+        const titlePosBtn = document.getElementById('opt-title-pos');
+        if (titlePosBtn) {
+            titlePosBtn.addEventListener('click', e => {
+                e.preventDefault();
+                if (!cm.state.options) cm.state.options = {};
+                let current = cm.state.options.titlePosition || 'default';
+                cm.state.options.titlePosition = (current === 'default') ? 'top' : 'default';
+                cm.saveOptions();
+                updateOptionsUI();
+            });
+        }
+
+        const hideControlsBtn = document.getElementById('opt-hide-controls');
+        if (hideControlsBtn) {
+            hideControlsBtn.addEventListener('click', e => {
+                e.preventDefault();
+                closeAllModalsAndMenus();
+                document.body.classList.add('hide-controls-mode');
+                if (ui && ui.showNotification) {
+                    ui.showNotification("Left click anywhere to unhide controls");
+                }
+
+                function unhideOnLeftClick(evt) {
+                    if (evt.button === 0) {
+                        evt.preventDefault();
+                        evt.stopPropagation();
+                        evt.stopImmediatePropagation();
+                        document.body.classList.remove('hide-controls-mode');
+                        window.removeEventListener('mousedown', unhideOnLeftClick, true);
+                        window.removeEventListener('click', unhideOnLeftClick, true);
+                    }
+                }
+
+                setTimeout(() => {
+                    window.addEventListener('mousedown', unhideOnLeftClick, true);
+                    window.addEventListener('click', unhideOnLeftClick, true);
+                }, 10);
             });
         }
 
