@@ -22,7 +22,7 @@ window.UIManager = (function() {
         while ((node = walker.nextNode())) {
             let parentTag = node.parentElement ? node.parentElement.tagName : '';
             if (['SCRIPT', 'STYLE', 'INPUT', 'TEXTAREA'].includes(parentTag)) continue;
-            if (node.parentElement && node.parentElement.closest('#track-title, #time-current, #time-total, #ascii-bar, #lyrics-content, #playlist-status-text, #index-box, #index-results, #custom-index-box, #search-results, #vol-bar, #eq-bass-bar, #eq-mid-bar, #eq-treble-bar, #scp-text, #clock-display, #keybind-modal, #welcome-modal, #dev-modal, #cmd-palette, #stat-monitor')) continue;
+            if (node.parentElement && node.parentElement.closest('#track-title, #time-current, #time-total, #ascii-bar, #lyrics-content, #playlist-status-text, #index-box, #index-results, #custom-index-box, #search-results, #vol-bar, #eq-bass-bar, #eq-mid-bar, #eq-treble-bar, #scp-text, #clock-display, #keybind-modal, #welcome-modal, #dev-modal, #cmd-palette, #stat-monitor, #search-help-modal')) continue;
 
             if (node.nodeValue.trim() !== "") originalTextNodes.set(node, node.nodeValue);
         }
@@ -39,15 +39,29 @@ window.UIManager = (function() {
         return applyTextFilters(str);
     }
 
-    function showNotification(message, onClick) {
+    function clearTrackNotifications() {
+        const container = document.getElementById('notification-container');
+        if (!container) return;
+        const trackNotifs = container.querySelectorAll('.notification-item[data-type="track"]');
+        trackNotifs.forEach(notif => notif.remove());
+    }
+
+    function showNotification(message, onClick, type) {
         let cm = window.ConfigManager;
         if (cm.state.options && cm.state.options.notifications === false) return;
 
         const container = document.getElementById('notification-container');
         if (!container) return;
 
+        if (type === 'track') {
+            clearTrackNotifications();
+        }
+
         const notif = document.createElement('div');
         notif.className = 'notification-item';
+        if (type) {
+            notif.setAttribute('data-type', type);
+        }
         if (onClick) {
             notif.style.cursor = 'pointer';
         }

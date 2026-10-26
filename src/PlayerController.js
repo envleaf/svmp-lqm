@@ -122,7 +122,7 @@ window.PlayerController = (function() {
         if (track && cm.state.options && cm.state.options.trackNotif) {
             let notifStr = `${track.title}`;
             if (track.artist) notifStr = `${track.artist} - ${track.title}`;
-            ui.showNotification(`now playing: ${notifStr}`);
+            ui.showNotification(`now playing: ${notifStr}`, null, 'track');
         }
 
         let initialArtUrl = track ? (track.onlineArtUrl || '') : '';
