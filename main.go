@@ -1,9 +1,23 @@
 package main
 
 /*
-#cgo pkg-config: glib-2.0
+#cgo pkg-config: glib-2.0 gobject-2.0
 #include <glib.h>
+#include <glib-object.h>
 #include <stdlib.h>
+
+extern void goOnWindowClose(void* winPtr);
+
+static gboolean on_gtk_delete_event(void* widget, void* event, void* user_data) {
+    goOnWindowClose(user_data);
+    return 1;
+}
+
+static void attach_delete_event(void* gtkWindow, void* user_data) {
+    if (gtkWindow != NULL) {
+        g_signal_connect(G_OBJECT(gtkWindow), "delete-event", G_CALLBACK(on_gtk_delete_event), user_data);
+    }
+}
 */
 import "C"
 
@@ -51,8 +65,82 @@ type TrackInfo struct {
 
 var currentBrowserPath string
 var selectedMusicDir string
-var w webview.WebView
 var localServerPort string
+
+type WindowManager struct {
+	mu      sync.Mutex
+	windows map[webview.WebView]bool
+	ptrMap  map[unsafe.Pointer]webview.WebView
+}
+
+var winMgr = &WindowManager{
+	windows: make(map[webview.WebView]bool),
+	ptrMap:  make(map[unsafe.Pointer]webview.WebView),
+}
+
+func (wm *WindowManager) Add(w webview.WebView) {
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+	wm.windows[w] = true
+	if ptr := w.Window(); ptr != nil {
+		wm.ptrMap[ptr] = w
+	}
+}
+
+func (wm *WindowManager) Remove(w webview.WebView) int {
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+	delete(wm.windows, w)
+	if ptr := w.Window(); ptr != nil {
+		delete(wm.ptrMap, ptr)
+	}
+	return len(wm.windows)
+}
+
+func (wm *WindowManager) Count() int {
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+	return len(wm.windows)
+}
+
+func (wm *WindowManager) GetByPtr(ptr unsafe.Pointer) webview.WebView {
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+	return wm.ptrMap[ptr]
+}
+
+func (wm *WindowManager) BroadcastJS(js string) {
+	wm.mu.Lock()
+	wins := make([]webview.WebView, 0, len(wm.windows))
+	for w := range wm.windows {
+		wins = append(wins, w)
+	}
+	wm.mu.Unlock()
+
+	for _, w := range wins {
+		w.Dispatch(func() {
+			w.Eval(js)
+		})
+	}
+}
+
+//export goOnWindowClose
+func goOnWindowClose(wPtr unsafe.Pointer) {
+	w := winMgr.GetByPtr(wPtr)
+	if w != nil {
+		w.Dispatch(func() {
+			closeWindow(w)
+		})
+	}
+}
+
+func closeWindow(w webview.WebView) {
+	remaining := winMgr.Remove(w)
+	w.Destroy()
+	if remaining == 0 {
+		os.Exit(0)
+	}
+}
 
 var execDir string
 var configPath string
@@ -422,42 +510,45 @@ func saveConfig(config AppConfig) {
 	}
 }
 
-func main() {
-	serverStartTime = time.Now()
-
-	cs := C.CString("svmp-lqm")
-	C.g_set_prgname(cs)
-	C.free(unsafe.Pointer(cs))
-
-	execPath, err := os.Executable()
-	if err == nil {
-		execDir = filepath.Dir(execPath)
-		configPath = filepath.Join(execDir, "svmp-lqm.conf")
-	} else {
-		execDir = "."
-		configPath = "svmp-lqm.conf"
-	}
-
-	// Setup embedded file server on a random open port
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		log.Fatal(err)
-	}
-	localServerPort = fmt.Sprintf("%d", listener.Addr().(*net.TCPAddr).Port)
-
-	go startServer(listener)
-	// give it a sec to start
-	time.Sleep(200 * time.Millisecond)
-
+func createAndShowWindow() webview.WebView {
 	debug := true
-	w = webview.New(debug)
-	defer w.Destroy()
+	w := webview.New(debug)
+	if w == nil {
+		return nil
+	}
+	winMgr.Add(w)
+	if ptr := w.Window(); ptr != nil {
+		C.attach_delete_event(ptr, ptr)
+	}
 
 	w.SetTitle("SVMP (LQM)")
 	w.SetSize(900, 700, webview.HintNone)
 
+	bindWindowFunctions(w)
+
+	config := loadConfig()
+	configBytes, _ := json.Marshal(config)
+	initJS := fmt.Sprintf("window.__INITIAL_CONFIG__ = %s;", string(configBytes))
+	w.Init(initJS)
+
+	w.Navigate(fmt.Sprintf("http://127.0.0.1:%s/player.html", localServerPort))
+	return w
+}
+
+func bindWindowFunctions(w webview.WebView) {
 	homeDir, _ := os.UserHomeDir()
-	currentBrowserPath = filepath.Join(homeDir, "Music")
+
+	w.Bind("goOpenNewWindow", func() {
+		w.Dispatch(func() {
+			createAndShowWindow()
+		})
+	})
+
+	w.Bind("goCloseCurrentWindow", func() {
+		w.Dispatch(func() {
+			closeWindow(w)
+		})
+	})
 
 	w.Bind("goGetDefaultDir", func() string {
 		return filepath.Join(homeDir, "Music")
@@ -498,9 +589,6 @@ func main() {
 		}
 		saveConfig(config)
 	})
-
-	config := loadConfig()
-	configBytes, _ := json.Marshal(config)
 
 	w.Bind("goUpdateMprisStatus", func(status string) {
 		updateMprisStatus(status)
@@ -581,15 +669,45 @@ func main() {
 	w.Bind("goPerformUpdate", func() UpdateResult {
 		return goPerformUpdate()
 	})
+}
+
+func main() {
+	serverStartTime = time.Now()
+
+	cs := C.CString("svmp-lqm")
+	C.g_set_prgname(cs)
+	C.free(unsafe.Pointer(cs))
+
+	execPath, err := os.Executable()
+	if err == nil {
+		execDir = filepath.Dir(execPath)
+		configPath = filepath.Join(execDir, "svmp-lqm.conf")
+	} else {
+		execDir = "."
+		configPath = "svmp-lqm.conf"
+	}
+
+	homeDir, _ := os.UserHomeDir()
+	currentBrowserPath = filepath.Join(homeDir, "Music")
+
+	// Setup embedded file server on a random open port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		log.Fatal(err)
+	}
+	localServerPort = fmt.Sprintf("%d", listener.Addr().(*net.TCPAddr).Port)
+
+	go startServer(listener)
+	// give it a sec to start
+	time.Sleep(200 * time.Millisecond)
 
 	initMpris()
 
-	// Inject the initial config into the window object
-	initJS := fmt.Sprintf("window.__INITIAL_CONFIG__ = %s;", string(configBytes))
-	w.Init(initJS)
-
-	w.Navigate(fmt.Sprintf("http://127.0.0.1:%s/player.html", localServerPort))
-	w.Run()
+	mainW := createAndShowWindow()
+	if mainW != nil {
+		defer mainW.Destroy()
+		mainW.Run()
+	}
 }
 
 func startServer(listener net.Listener) {
@@ -676,9 +794,7 @@ func listDirectory(path string) {
 
 	itemsJSON, _ := json.Marshal(items)
 	js := fmt.Sprintf("window.goUpdateDirList(%q, %s);", path, itemsJSON)
-	w.Dispatch(func() {
-		w.Eval(js)
-	})
+	winMgr.BroadcastJS(js)
 }
 
 type UpdateResult struct {
@@ -999,15 +1115,10 @@ func scanAndWatchDirectory(root string) {
 	scanMutex.Unlock()
 
 	// Notify JS that indexing started
-	w.Dispatch(func() {
-		js := fmt.Sprintf("if (window.onIndexingStart) window.onIndexingStart(%q);", root)
-		w.Eval(js)
-	})
+	winMgr.BroadcastJS(fmt.Sprintf("if (window.onIndexingStart) window.onIndexingStart(%q);", root))
 
 	// Clear existing playlist in JS
-	w.Dispatch(func() {
-		w.Eval("window.liveClearPlaylist();")
-	})
+	winMgr.BroadcastJS("window.liveClearPlaylist();")
 
 	var err error
 	wWatcher, err := fsnotify.NewWatcher()
@@ -1036,9 +1147,7 @@ func scanAndWatchDirectory(root string) {
 		b, err := json.Marshal(trackBatch)
 		if err == nil {
 			js := fmt.Sprintf("window.liveAddTracks(%s);", string(b))
-			w.Dispatch(func() {
-				w.Eval(js)
-			})
+			winMgr.BroadcastJS(js)
 		}
 		trackBatch = nil
 	}
@@ -1076,9 +1185,7 @@ func scanAndWatchDirectory(root string) {
 	flushBatch()
 
 	// Notify JS that indexing complete
-	w.Dispatch(func() {
-		w.Eval("if (window.onIndexingComplete) window.onIndexingComplete();")
-	})
+	winMgr.BroadcastJS("if (window.onIndexingComplete) window.onIndexingComplete();")
 
 	// Watch loop
 	go func() {
@@ -1110,9 +1217,7 @@ func scanAndWatchDirectory(root string) {
 						if len(newTracks) > 0 && ctx.Err() == nil {
 							b, _ := json.Marshal(newTracks)
 							js := fmt.Sprintf("window.liveAddTracks(%s);", string(b))
-							w.Dispatch(func() {
-								w.Eval(js)
-							})
+							winMgr.BroadcastJS(js)
 						}
 					} else if isAudioFile(event.Name) && ctx.Err() == nil {
 						pushTrackToJS(event.Name)
@@ -1185,7 +1290,5 @@ func pushTrackToJS(path string) {
 	info := parseTrackInfo(path)
 	b, _ := json.Marshal(info)
 	js := fmt.Sprintf("window.liveAddTrack(%s);", string(b))
-	w.Dispatch(func() {
-		w.Eval(js)
-	})
+	winMgr.BroadcastJS(js)
 }

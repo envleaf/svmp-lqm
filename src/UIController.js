@@ -86,6 +86,9 @@ window.UIController = (function() {
         });
         ae.applyEQ(cm.state.eq);
         cm.saveEq();
+        if (window.WindowSync && !window.WindowSync.isReceivingRemote()) {
+            window.WindowSync.broadcastState('SYNC_EQ', { eq: cm.state.eq });
+        }
     }
 
     function updateFxUI() {
@@ -1374,6 +1377,9 @@ window.UIController = (function() {
 
                 cm.saveFx();
                 updateFxUI();
+                if (window.WindowSync && !window.WindowSync.isReceivingRemote()) {
+                    window.WindowSync.broadcastState('SYNC_FX', { fx: cm.state.fx, isUwu: cm.state.isUwu, clockState: cm.state.clockState, isSway: cm.state.isSway, isMobile: cm.state.isMobile });
+                }
             });
         });
 
@@ -1613,6 +1619,18 @@ window.UIController = (function() {
             if (e.ctrlKey || e.metaKey || e.altKey) return;
 
             switch (e.code) {
+                case 'KeyN':
+                    e.preventDefault();
+                    if (e.shiftKey) {
+                        if (window.goCloseCurrentWindow) {
+                            window.goCloseCurrentWindow();
+                        }
+                    } else {
+                        if (window.goOpenNewWindow) {
+                            window.goOpenNewWindow();
+                        }
+                    }
+                    break;
                 case 'Space':
                     e.preventDefault();
                     if (isScpMode) break;
