@@ -213,6 +213,7 @@ window.PlayerController = (function() {
 
         if (!pm.getActiveTrack()) return;
         let activeTrack = pm.getActiveTrack();
+        activeTrack.lastPlayed = Date.now();
         if (activeTrack && activeTrack.originalPath && window.goAddToRecents) {
             window.goAddToRecents(activeTrack.originalPath);
             if (window.ListsManager && window.ListsManager.currentListsView === 'playlist' && window.ListsManager.currentViewingPlaylist === 'recents') {

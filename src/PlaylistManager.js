@@ -82,7 +82,11 @@ window.PlaylistManager = (function() {
             title: parsedTitle || "Unknown",
             artist: trackData.artist || '',
             album: trackData.album || '',
-            originalPath: trackData.originalPath || ''
+            originalPath: trackData.originalPath || '',
+            modTime: trackData.modTime || 0,
+            trackNumber: trackData.trackNumber || 0,
+            duration: trackData.duration || 0,
+            lastPlayed: trackData.lastPlayed || 0
         };
 
         playlist.push(newTrack);
@@ -109,7 +113,17 @@ window.PlaylistManager = (function() {
             const fileURL = URL.createObjectURL(file);
             let cleanName = file.name.replace(/\.[^/.]+$/, "");
 
-            let trackData = { file: file, src: fileURL, title: cleanName, artist: '', album: '' };
+            let trackData = {
+                file: file,
+                src: fileURL,
+                title: cleanName,
+                artist: '',
+                album: '',
+                modTime: file.lastModified ? Math.floor(file.lastModified / 1000) : 0,
+                trackNumber: 0,
+                duration: 0,
+                lastPlayed: 0
+            };
             let addedIndex = playlist.length;
             playlist.push(trackData);
 
@@ -124,6 +138,12 @@ window.PlaylistManager = (function() {
                         }
                         if (tag.tags.album) {
                             playlist[addedIndex].album = tag.tags.album || '';
+                        }
+                        if (tag.tags.track) {
+                            let parsedTrack = parseInt(tag.tags.track, 10);
+                            if (!isNaN(parsedTrack)) {
+                                playlist[addedIndex].trackNumber = parsedTrack;
+                            }
                         }
                         filesProcessed++;
                         checkDone();
