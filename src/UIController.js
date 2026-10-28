@@ -413,24 +413,25 @@ window.UIController = (function() {
 
     function parseSearchQuery(rawQuery) {
         let q = rawQuery.trim();
-        if (!q) return { title: '', artist: null, album: null };
+        if (!q) return { title: '', artist: null, album: null, sort: null };
 
-        const operandRegex = /(?:^|\s)(a:|b:)/gi;
+        const operandRegex = /(?:^|\s)(a:|b:|s:)/gi;
         let matches = [];
         let match;
         while ((match = operandRegex.exec(q)) !== null) {
             let operand = match[1].toLowerCase();
-            let operandStart = match.index + (match[0].length - match[1].length);
+            let operandStart = match.index + match[0].indexOf(match[1]);
             matches.push({ operand: operand, start: operandStart, length: match[1].length });
         }
 
         if (matches.length === 0) {
-            return { title: q, artist: null, album: null };
+            return { title: q, artist: null, album: null, sort: null };
         }
 
         let title = q.substring(0, matches[0].start).trim();
         let artist = null;
         let album = null;
+        let sort = null;
 
         for (let i = 0; i < matches.length; i++) {
             let current = matches[i];
@@ -442,10 +443,17 @@ window.UIController = (function() {
                 artist = val;
             } else if (current.operand === 'b:') {
                 album = val;
+            } else if (current.operand === 's:') {
+                if (sort === null) {
+                    let firstWord = val.split(/\s+/)[0].toLowerCase();
+                    if (['a', 'ar', 'd', 'dr', 't', 'tr', 'p', 'pr'].includes(firstWord)) {
+                        sort = firstWord;
+                    }
+                }
             }
         }
 
-        return { title, artist, album };
+        return { title, artist, album, sort };
     }
 
     function executeSearch() {
@@ -471,15 +479,14 @@ window.UIController = (function() {
         let artistQ = parsed.artist !== null ? parsed.artist.toLowerCase() : null;
         let albumQ = parsed.album !== null ? parsed.album.toLowerCase() : null;
 
-        let html = '';
-        let count = 0;
         matchingSearchResults = [];
 
         const playlist = pm.playlist;
         const activeIndices = pm.activeIndices;
 
-        activeIndices.forEach((globalIdx, localIdx) => {
+        activeIndices.forEach((globalIdx) => {
             let track = playlist[globalIdx];
+            if (!track) return;
 
             // Artist filter check
             if (artistQ !== null) {
@@ -509,7 +516,75 @@ window.UIController = (function() {
             }
 
             matchingSearchResults.push(globalIdx);
-            let num = String(localIdx + 1).padStart(2, '0');
+        });
+
+        if (parsed.sort) {
+            let sortCode = parsed.sort;
+            matchingSearchResults.sort((idxA, idxB) => {
+                let a = playlist[idxA];
+                let b = playlist[idxB];
+                if (!a || !b) return 0;
+
+                if (sortCode === 'a' || sortCode === 'ar') {
+                    let albumA = (a.album || '').toLowerCase();
+                    let albumB = (b.album || '').toLowerCase();
+                    let albumComp = albumA.localeCompare(albumB);
+                    let result = 0;
+                    if (albumComp !== 0) {
+                        result = albumComp;
+                    } else {
+                        let tA = a.trackNumber || 0;
+                        let tB = b.trackNumber || 0;
+                        if (tA > 0 && tB > 0) {
+                            result = tA - tB;
+                        } else if (tA > 0 && tB === 0) {
+                            result = -1;
+                        } else if (tA === 0 && tB > 0) {
+                            result = 1;
+                        } else {
+                            result = idxA - idxB;
+                        }
+                    }
+                    return sortCode === 'ar' ? -result : result;
+                } else if (sortCode === 'd' || sortCode === 'dr') {
+                    let mA = a.modTime || 0;
+                    let mB = b.modTime || 0;
+                    let diff = mB - mA;
+                    if (diff === 0) diff = idxA - idxB;
+                    return sortCode === 'dr' ? -diff : diff;
+                } else if (sortCode === 't' || sortCode === 'tr') {
+                    let dA = a.duration || 0;
+                    let dB = b.duration || 0;
+                    let diff = dB - dA;
+                    if (diff === 0) diff = idxA - idxB;
+                    return sortCode === 'tr' ? -diff : diff;
+                } else if (sortCode === 'p' || sortCode === 'pr') {
+                    let pA = a.lastPlayed || 0;
+                    let pB = b.lastPlayed || 0;
+                    let result = 0;
+                    if (pA > 0 && pB > 0) {
+                        result = sortCode === 'pr' ? (pA - pB) : (pB - pA);
+                    } else if (pA > 0 && pB === 0) {
+                        result = -1;
+                    } else if (pA === 0 && pB > 0) {
+                        result = 1;
+                    } else {
+                        result = idxA - idxB;
+                    }
+                    return result;
+                }
+                return 0;
+            });
+        }
+
+        let html = '';
+        let count = matchingSearchResults.length;
+
+        matchingSearchResults.forEach((globalIdx, searchResultIdx) => {
+            let track = playlist[globalIdx];
+            let localIdx = activeIndices.indexOf(globalIdx);
+            let displayIdx = localIdx >= 0 ? localIdx : searchResultIdx;
+            let num = String(displayIdx + 1).padStart(2, '0');
             let qPrefix = getQueuePrefix(globalIdx);
 
             let highlightedTitle;
@@ -528,7 +603,6 @@ window.UIController = (function() {
             }
 
             html += `<div style="display: flex;"><a href="#" class="info-btn" data-idx="${globalIdx}" style="text-decoration: none; margin-right: 5px;">[i]</a><a href="#" class="search-result-link track-link" data-idx="${globalIdx}" style="display: block; text-decoration: none; flex-grow: 1;">| ${num}. ${highlightedTitle}</a></div>`;
-            count++;
         });
 
         if (count === 0) {
@@ -1153,7 +1227,7 @@ window.UIController = (function() {
                 if (currentInfoIdx !== -1) {
                     let track = pm.playlist[currentInfoIdx];
                     if (track && track.artist && track.artist.toLowerCase() !== 'unknown') {
-                        triggerSearchQuery(`a: ${track.artist.toLowerCase().trim()}`);
+                        triggerSearchQuery(`a: ${track.artist.toLowerCase().trim()} s:a`);
                     }
                 }
             });
@@ -1165,7 +1239,7 @@ window.UIController = (function() {
                 if (currentInfoIdx !== -1) {
                     let track = pm.playlist[currentInfoIdx];
                     if (track && track.album && track.album.toLowerCase() !== 'unknown') {
-                        triggerSearchQuery(`b: ${track.album.toLowerCase().trim()}`);
+                        triggerSearchQuery(`b: ${track.album.toLowerCase().trim()} s:a`);
                     }
                 }
             });

@@ -70,6 +70,8 @@ type TrackInfo struct {
 	Album        string `json:"album"`
 	OriginalName string `json:"originalName"`
 	OriginalPath string `json:"originalPath"`
+	ModTime      int64  `json:"modTime"`
+	TrackNumber  int    `json:"trackNumber"`
 }
 
 var currentBrowserPath string
@@ -1084,6 +1086,10 @@ func parseTrackInfo(path string) TrackInfo {
 		OriginalPath: path,
 	}
 
+	if fileInfo, err := os.Stat(path); err == nil {
+		info.ModTime = fileInfo.ModTime().Unix()
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered panic while parsing metadata for %s: %v", path, r)
@@ -1098,6 +1104,8 @@ func parseTrackInfo(path string) TrackInfo {
 			info.Title = m.Title()
 			info.Artist = m.Artist()
 			info.Album = m.Album()
+			trackNum, _ := m.Track()
+			info.TrackNumber = trackNum
 		}
 	}
 	return info
