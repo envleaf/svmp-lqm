@@ -856,8 +856,7 @@ window.UIController = (function() {
     function toggleFocus() {
         document.body.classList.toggle('focus-mode');
         if (document.body.classList.contains('focus-mode')) {
-            document.querySelectorAll('.menu-box').forEach(box => box.style.display = 'none');
-            document.querySelectorAll('.menu-toggle').forEach(btn => btn.innerText = ui.t(btn.innerText.replace('-', '+')));
+            closeAllModalsAndMenus();
         }
         if (window.VisualEngine) window.VisualEngine.updateVisualizerDisplay();
         if (window.updateTimebarDisplay) window.updateTimebarDisplay();
@@ -1109,33 +1108,6 @@ window.UIController = (function() {
             });
         }
 
-        const hideControlsBtn = document.getElementById('opt-hide-controls');
-        if (hideControlsBtn) {
-            hideControlsBtn.addEventListener('click', e => {
-                e.preventDefault();
-                closeAllModalsAndMenus();
-                document.body.classList.add('hide-controls-mode');
-                if (ui && ui.showNotification) {
-                    ui.showNotification("Left click anywhere to unhide controls");
-                }
-
-                function unhideOnLeftClick(evt) {
-                    if (evt.button === 0) {
-                        evt.preventDefault();
-                        evt.stopPropagation();
-                        evt.stopImmediatePropagation();
-                        document.body.classList.remove('hide-controls-mode');
-                        window.removeEventListener('mousedown', unhideOnLeftClick, true);
-                        window.removeEventListener('click', unhideOnLeftClick, true);
-                    }
-                }
-
-                setTimeout(() => {
-                    window.addEventListener('mousedown', unhideOnLeftClick, true);
-                    window.addEventListener('click', unhideOnLeftClick, true);
-                }, 10);
-            });
-        }
 
         const closeWelcome = document.getElementById('close-welcome');
         if (closeWelcome) {
@@ -1403,7 +1375,6 @@ window.UIController = (function() {
         const optResetBtn = document.getElementById('opt-reset');
         const optDisableErrorSkipBtn = document.getElementById('opt-disable-error-skip');
         const checkUpdatesBtn = document.getElementById('opt-check-updates');
-        const musicUnfocus = document.getElementById('music-unfocus');
 
         if (checkUpdatesBtn) {
             checkUpdatesBtn.addEventListener('click', e => {
@@ -1425,7 +1396,6 @@ window.UIController = (function() {
         });
         if (optDeckBtn) optDeckBtn.addEventListener('click', e => { e.preventDefault(); cm.state.isSway = !cm.state.isSway; if (cm.state.isSway) cm.state.isMobile = false; localStorage.setItem('env_mobile', cm.state.isSway); updateOptionsUI(); });
         if (optFocusBtn) optFocusBtn.addEventListener('click', e => { e.preventDefault(); toggleFocus(); });
-        if (musicUnfocus) musicUnfocus.addEventListener('click', e => { e.preventDefault(); toggleFocus(); });
 
         let resetTimer = null;
         if (optResetBtn) optResetBtn.addEventListener('click', e => {
