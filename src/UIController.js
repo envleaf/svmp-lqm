@@ -210,8 +210,8 @@ window.UIController = (function() {
         }
         const prevBtn = document.getElementById('music-prev');
         const nextBtn = document.getElementById('music-next');
-        if (prevBtn) prevBtn.innerText = (controlsSplit === 'split') ? '[^^]' : '[<<]';
-        if (nextBtn) nextBtn.innerText = (controlsSplit === 'split') ? '[vv]' : '[>>]';
+        if (prevBtn) prevBtn.innerText = (controlsSplit === 'split') ? '[^]' : '[<<]';
+        if (nextBtn) nextBtn.innerText = (controlsSplit === 'split') ? '[v]' : '[>>]';
 
         if (window.VisualEngine) window.VisualEngine.updateExpieUI();
 
