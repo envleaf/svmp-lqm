@@ -451,7 +451,6 @@ body.focus-mode #scp-text {
 </head>
 <body>
 
-<canvas id="timebar-canvas" style="position: fixed; top: 0; left: 0; width: 100%; height: 5px; z-index: 999999; pointer-events: none;"></canvas>
 <div id="notification-container"></div>
 <div id="ascii-bg"></div>
 <canvas id="live-visualizer"></canvas>
@@ -508,21 +507,23 @@ body.focus-mode #scp-text {
 |  [Esc]     close all menus/modals     |
 |  [/]       toggle this menu           |
 |                                       |
-|  <a href="#" id="version-patch-link" style="text-decoration: none;">svmp-lqm v71-nightly</a>               |
+|  <a href="#" id="version-patch-link" style="text-decoration: none;">svmp-lqm v72-nightly</a>               |
 +---------------------------------------+</pre>
 </div>
 
 <div id="patch-notes-modal" class="overlay-modal">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0; color: var(--text-color);">
-+-- patch notes (v71-nightly) -----------+
++-- patch notes (v72-nightly) -----------+
 |                                       |
-|  - Modular UI & Title Position:       |
-|    Toggle song title position between |
-|    default & top in [opt +].          |
-|  - Reworked Focus Mode:               |
-|    Reworked focus mode to hide player |
-|    controls layout.                   |
+|  - Titlebar Position Fix:             |
+|    Fixed title position persistence   |
+|    across UI and FX state updates.    |
+|  - Focus Mode Visualizer:             |
+|    Kept live audio visualizer active  |
+|    during Focus Mode.                 |
+|  - Timebar Cleanup:                   |
+|    Removed timebar element & logic.   |
 |                                       |
 +---------------------------------------+</pre>
 </div>
@@ -695,12 +696,6 @@ body.focus-mode #scp-text {
         <div class="fx-col">
             <strong style="color: var(--text-color);">Music Folder Location</strong>
             <a href="#" id="music-dl-add">[add files]</a>
-
-            <strong style="color: var(--text-color); margin-top: 10px; display: block;">timebar</strong>
-            <div>
-                <a href="#" class="opt-toggle" data-opt="timebar" data-val="true">[x] on</a>
-                <a href="#" class="opt-toggle" data-opt="timebar" data-val="false">[ ] off</a>
-            </div>
 
             <strong style="color: var(--text-color); margin-top: 10px; display: block;">fullscreen</strong>
             <div>
