@@ -354,7 +354,20 @@
     }
 }
 
-/* Modular UI */
+/* Modular UI & Split Controls */
+/*
+   Titlebar & Control Positioning Notes:
+   - When controls-split is active:
+     - .music-controls (left bar) is fixed to the left edge, vertically centered.
+     - #action-row (right bar) is fixed to the right edge, vertically centered.
+     - #ascii-progress-container is fixed top-center.
+   - Titlebar positions:
+     - default: title stays inside #music-ui in standard container flow.
+     - title-pos-top: title is fixed at top: 15px, left: 50%, transform: translateX(-50%).
+     - If title-pos-top AND controls-split are both active, #ascii-progress-container moves down to top: 55px (below top title).
+   - Future titlebar positions (e.g. bottom, left, floating) should adjust #ascii-progress-container's top/bottom offsets accordingly.
+*/
+
 body.title-pos-top #music-ui > p:first-child {
     position: fixed;
     top: 15px;
@@ -366,6 +379,56 @@ body.title-pos-top #music-ui > p:first-child {
     text-align: center;
     width: auto;
     max-width: 90vw;
+}
+
+body.controls-split .music-controls {
+    position: fixed;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 99990;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 0;
+}
+
+body.controls-split #action-row {
+    position: fixed;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 99990;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 0;
+}
+
+body.controls-split .music-controls a,
+body.controls-split #action-row a {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    display: inline-block;
+    white-space: nowrap;
+    letter-spacing: 1px;
+}
+
+body.controls-split #ascii-progress-container {
+    position: fixed;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 99990;
+    margin: 0;
+    width: auto;
+    max-width: 90vw;
+}
+
+body.controls-split.title-pos-top #ascii-progress-container {
+    top: 55px;
 }
 
 body.focus-mode .music-controls,
@@ -507,23 +570,19 @@ body.focus-mode #scp-text {
 |  [Esc]     close all menus/modals     |
 |  [/]       toggle this menu           |
 |                                       |
-|  <a href="#" id="version-patch-link" style="text-decoration: none;">svmp-lqm v72-nightly</a>               |
+|  <a href="#" id="version-patch-link" style="text-decoration: none;">svmp-lqm v73-nightly</a>               |
 +---------------------------------------+</pre>
 </div>
 
 <div id="patch-notes-modal" class="overlay-modal">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0; color: var(--text-color);">
-+-- patch notes (v72-nightly) -----------+
++-- patch notes (v73-nightly) -----------+
 |                                       |
-|  - Titlebar Position Fix:             |
-|    Fixed title position persistence   |
-|    across UI and FX state updates.    |
-|  - Focus Mode Visualizer:             |
-|    Kept live audio visualizer active  |
-|    during Focus Mode.                 |
-|  - Timebar Cleanup:                   |
-|    Removed timebar element & logic.   |
+|  - Split Controls Layout:             |
+|    Added option to split playback and |
+|    action controls vertically onto    |
+|    sides with expanding menu panels.  |
 |                                       |
 +---------------------------------------+</pre>
 </div>
@@ -715,6 +774,9 @@ body.focus-mode #scp-text {
             
             <strong style="color: var(--text-color); margin-top: 10px;">title position</strong>
             <a href="#" id="opt-title-pos">[title pos: default]</a>
+
+            <strong style="color: var(--text-color); margin-top: 10px;">split controls</strong>
+            <a href="#" id="opt-controls-split">[controls: default]</a>
 
             <strong style="color: var(--text-color); margin-top: 10px;">song change notifications</strong>
             <div>

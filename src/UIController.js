@@ -127,6 +127,9 @@ window.UIController = (function() {
         let titlePos = (cm.state.options && cm.state.options.titlePosition) ? cm.state.options.titlePosition : 'default';
         if (titlePos === 'top') bodyClasses.push('title-pos-top');
 
+        let controlsSplit = (cm.state.options && cm.state.options.controlsSplit) ? cm.state.options.controlsSplit : 'default';
+        if (controlsSplit === 'split') bodyClasses.push('controls-split');
+
         document.body.classList.remove('clock-small', 'clock-full');
         if (cm.state.clockState === 1) bodyClasses.push('clock-small');
         if (cm.state.clockState === 2) bodyClasses.push('clock-full');
@@ -197,6 +200,13 @@ window.UIController = (function() {
         const titlePosBtn = document.getElementById('opt-title-pos');
         if (titlePosBtn) {
             titlePosBtn.innerText = ui.t(`[title pos: ${titlePos}]`);
+        }
+
+        let controlsSplit = (cm.state.options && cm.state.options.controlsSplit) ? cm.state.options.controlsSplit : 'default';
+        document.body.classList.toggle('controls-split', controlsSplit === 'split');
+        const controlsSplitBtn = document.getElementById('opt-controls-split');
+        if (controlsSplitBtn) {
+            controlsSplitBtn.innerText = ui.t(`[controls: ${controlsSplit}]`);
         }
 
         if (window.VisualEngine) window.VisualEngine.updateExpieUI();
@@ -1098,6 +1108,18 @@ window.UIController = (function() {
             });
         }
 
+        const controlsSplitBtn = document.getElementById('opt-controls-split');
+        if (controlsSplitBtn) {
+            controlsSplitBtn.addEventListener('click', e => {
+                e.preventDefault();
+                if (!cm.state.options) cm.state.options = {};
+                let current = cm.state.options.controlsSplit || 'default';
+                cm.state.options.controlsSplit = (current === 'default') ? 'split' : 'default';
+                cm.saveOptions();
+                updateOptionsUI();
+            });
+        }
+
         const titlePosBtn = document.getElementById('opt-title-pos');
         if (titlePosBtn) {
             titlePosBtn.addEventListener('click', e => {
@@ -1808,6 +1830,10 @@ window.UIController = (function() {
                     if (audioEl && audioEl.duration) audioEl.currentTime = Math.min(audioEl.duration || 0, audioEl.currentTime + 5);
                     break;
             }
+        });
+
+        window.addEventListener('resize', () => {
+            if (ui && ui.syncMenuBoxWidth) ui.syncMenuBoxWidth();
         });
 
         document.addEventListener('fullscreenchange', () => {
