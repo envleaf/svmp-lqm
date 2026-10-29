@@ -124,6 +124,9 @@ window.UIController = (function() {
         if (cm.state.isMobile) bodyClasses.push('mobile-mode');
         if (isScpMode) bodyClasses.push('scp-mode');
 
+        let titlePos = (cm.state.options && cm.state.options.titlePosition) ? cm.state.options.titlePosition : 'default';
+        if (titlePos === 'top') bodyClasses.push('title-pos-top');
+
         document.body.classList.remove('clock-small', 'clock-full');
         if (cm.state.clockState === 1) bodyClasses.push('clock-small');
         if (cm.state.clockState === 2) bodyClasses.push('clock-full');
@@ -859,7 +862,6 @@ window.UIController = (function() {
             closeAllModalsAndMenus();
         }
         if (window.VisualEngine) window.VisualEngine.updateVisualizerDisplay();
-        if (window.updateTimebarDisplay) window.updateTimebarDisplay();
         updateOptionsUI();
     }
 
@@ -1430,9 +1432,7 @@ window.UIController = (function() {
                     if (!cm.state.options) cm.state.options = {};
                     cm.state.options[opt] = val;
                     cm.saveOptions();
-                    if (opt === 'timebar') {
-                        if (window.updateTimebarDisplay) window.updateTimebarDisplay();
-                    } else if (opt === 'fullscreen') {
+                    if (opt === 'fullscreen') {
                         syncFullscreenState(val);
                     }
                 }
