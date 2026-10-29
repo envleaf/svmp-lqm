@@ -269,9 +269,6 @@
         input[type="text"]:focus { border-bottom: 1px solid var(--text-color); }
         hr.section-line { border: 0; border-bottom: 1px dashed var(--prompt-color); margin: 2em 0; width: 100%; }
 
-        body.focus-mode .focus-hide { display: none !important; }
-        #music-unfocus { display: none; }
-        body.focus-mode #music-unfocus { display: inline-block !important; }
 
         /* FX Grid System */
         .fx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 15px; margin-top: 0.5em; }
@@ -357,7 +354,7 @@
     }
 }
 
-/* Modular UI & Hide Controls */
+/* Modular UI */
 body.title-pos-top #music-ui > p:first-child {
     position: fixed;
     top: 15px;
@@ -371,11 +368,12 @@ body.title-pos-top #music-ui > p:first-child {
     max-width: 90vw;
 }
 
-body.hide-controls-mode .music-controls,
-body.hide-controls-mode #ascii-progress-container,
-body.hide-controls-mode #playlist-status-text,
-body.hide-controls-mode #action-row,
-body.hide-controls-mode .menu-box:not(.overlay-modal) {
+body.focus-mode .music-controls,
+body.focus-mode #ascii-progress-container,
+body.focus-mode #playlist-status-text,
+body.focus-mode #action-row,
+body.focus-mode .menu-box:not(.overlay-modal),
+body.focus-mode #scp-text {
     display: none !important;
 }
 
@@ -460,7 +458,7 @@ body.hide-controls-mode .menu-box:not(.overlay-modal) {
 <div id="star-container"></div>
 <img id="expie-img" src="expie.png" style="display: none; position: fixed; bottom: 0; z-index: 999998;">
 <div id="scp-overlay"></div>
-<p id="scp-text" class="focus-hide">[press left click to blink]</p>
+<p id="scp-text">[press left click to blink]</p>
 <div id="clock-display"></div>
 <div id="stat-monitor" style="display: none; position: fixed; top: 10px; right: 10px; background: #000000; border: 1px solid var(--prompt-color); color: var(--text-color); font-family: 'Source Code Pro', monospace; font-size: 0.75rem; padding: 8px 12px; z-index: 100001; text-align: left; pointer-events: none; line-height: 1.4; white-space: pre;"></div>
 
@@ -486,7 +484,7 @@ body.hide-controls-mode .menu-box:not(.overlay-modal) {
     <p style="text-align: center; margin-top: 20px;"><a href="#" id="close-welcome">[start]</a></p>
 </div>
 
-<div id="keybind-modal" class="overlay-modal focus-hide">
+<div id="keybind-modal" class="overlay-modal">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0; color: var(--text-color);">
 +-- system keybinds --------------------+
@@ -514,7 +512,7 @@ body.hide-controls-mode .menu-box:not(.overlay-modal) {
 +---------------------------------------+</pre>
 </div>
 
-<div id="patch-notes-modal" class="overlay-modal focus-hide">
+<div id="patch-notes-modal" class="overlay-modal">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0; color: var(--text-color);">
 +-- patch notes (v71-nightly) -----------+
@@ -522,9 +520,9 @@ body.hide-controls-mode .menu-box:not(.overlay-modal) {
 |  - Modular UI & Title Position:       |
 |    Toggle song title position between |
 |    default & top in [opt +].          |
-|  - Hide Player Controls option:       |
-|    Hide controls via [opt +], unhide  |
-|    by left-clicking anywhere.         |
+|  - Reworked Focus Mode:               |
+|    Reworked focus mode to hide player |
+|    controls layout.                   |
 |                                       |
 +---------------------------------------+</pre>
 </div>
@@ -542,15 +540,13 @@ body.hide-controls-mode .menu-box:not(.overlay-modal) {
             <a href="#" id="music-prev">[&lt;&lt;]</a>
             <a href="#" id="music-toggle">[play]</a>
             <a href="#" id="music-next">[&gt;&gt;]</a>
-            <a href="#" id="music-lists" class="focus-hide">[lists]</a>
-            <a href="#" id="music-shuffle" class="focus-hide">[shuffle ( )]</a>
-            <a href="#" id="music-info" class="focus-hide">[info]</a>
-            <a href="#" id="music-fav" class="focus-hide">[fav ( )]</a>
-
-            <a href="#" id="music-unfocus">[unfocus]</a>
+            <a href="#" id="music-lists">[lists]</a>
+            <a href="#" id="music-shuffle">[shuffle ( )]</a>
+            <a href="#" id="music-info">[info]</a>
+            <a href="#" id="music-fav">[fav ( )]</a>
         </p>
 
-        <div id="ascii-progress-container" class="focus-hide">
+        <div id="ascii-progress-container">
             <span id="time-current">0:00</span>
             <span id="ascii-bar">[--------------------]</span>
             <span id="time-total">0:00</span>
@@ -558,10 +554,10 @@ body.hide-controls-mode .menu-box:not(.overlay-modal) {
             <span id="vol-bar">[|||||.....]</span>
         </div>
 
-        <p style="font-size: 0.7em; color: var(--prompt-color); margin-top: 0.2em; margin-bottom: 0.2em;" id="playlist-status-text" class="focus-hide"></p>
+        <p style="font-size: 0.7em; color: var(--prompt-color); margin-top: 0.2em; margin-bottom: 0.2em;" id="playlist-status-text"></p>
     </div>
 
-    <p style="margin-top: 0.3em; margin-bottom: 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center;" id="action-row" class="focus-hide">
+    <p style="margin-top: 0.3em; margin-bottom: 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center;" id="action-row">
         <a href="#" id="music-index" class="menu-toggle" data-target="index-box">[library +]</a>
         <a href="#" id="music-queue" class="menu-toggle" data-target="queue-box">[queue +]</a>
         <a href="#" id="music-playlist" class="menu-toggle" data-target="playlist-box" style="display: none;">[playlist +]</a>
@@ -572,20 +568,20 @@ body.hide-controls-mode .menu-box:not(.overlay-modal) {
         <a href="#" id="music-opt" class="menu-toggle" data-target="opt-box">[opt +]</a>
     </p>
 
-<div id="index-box" class="menu-box scrollable focus-hide">
+<div id="index-box" class="menu-box scrollable">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0;">+-- music library ----------------------+</pre>
     <div id="index-results" style="margin-top: 0.5em; margin-bottom: 0; line-height: 1.8;"></div>
 </div>
 
-<div id="queue-box" class="menu-box scrollable focus-hide">
+<div id="queue-box" class="menu-box scrollable">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0;">+-- play queue -------------------------+</pre>
     <div id="queue-results" style="margin-top: 0.5em; margin-bottom: 0; line-height: 1.8;"></div>
 </div>
 
 <!-- DEPRECATED: playlist-box is legacy custom range builder UI -->
-<div id="playlist-box" class="menu-box scrollable focus-hide">
+<div id="playlist-box" class="menu-box scrollable">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0;">
 +-- custom playlist builder ------------+
@@ -598,7 +594,7 @@ body.hide-controls-mode .menu-box:not(.overlay-modal) {
     <pre id="custom-index-box" style="margin-top: 1em; margin-bottom: 0;"></pre>
 </div>
 
-<div id="search-box" class="menu-box scrollable focus-hide">
+<div id="search-box" class="menu-box scrollable">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0; display: inline-block;">+-- track search</pre> <a href="#" id="search-help-btn" style="font-size: 0.8em; text-decoration: none;">[?]</a><pre style="margin: 0; display: inline-block;"> -----------------------+</pre>
     <div style="display: flex; align-items: center; gap: 10px; margin-top: 0.5em; margin-bottom: 10px;">
@@ -609,12 +605,12 @@ body.hide-controls-mode .menu-box:not(.overlay-modal) {
     <div id="search-results" style="margin-top: 0.5em; margin-bottom: 0; line-height: 1.8;"></div>
 </div>
 
-<div id="lyrics-box" class="menu-box scrollable focus-hide">
+<div id="lyrics-box" class="menu-box scrollable">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0; white-space: pre-wrap;" id="lyrics-content">waiting for track...</pre>
 </div>
 
-<div id="eq-box" class="menu-box focus-hide">
+<div id="eq-box" class="menu-box">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0;">+-- audio equalizer --------------------+</pre>
 <pre style="margin: 0; font-size: 0.8em; color: #555;">(applies to local files only)</pre>
@@ -636,7 +632,7 @@ body.hide-controls-mode .menu-box:not(.overlay-modal) {
     </div>
 </div>
 
-<div id="fx-box" class="menu-box scrollable focus-hide">
+<div id="fx-box" class="menu-box scrollable">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0;">+-- visual engine ----------------------+</pre>
     <div class="fx-grid" id="standard-fx">
@@ -692,13 +688,13 @@ body.hide-controls-mode .menu-box:not(.overlay-modal) {
     </div>
 </div>
 
-<div id="opt-box" class="menu-box focus-hide">
+<div id="opt-box" class="menu-box">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0;">+-- options ----------------------------+</pre>
     <div class="fx-grid" style="margin-top: 1em;">
         <div class="fx-col">
             <strong style="color: var(--text-color);">Music Folder Location</strong>
-            <a href="#" id="music-dl-add" class="focus-hide">[add files]</a>
+            <a href="#" id="music-dl-add">[add files]</a>
 
             <strong style="color: var(--text-color); margin-top: 10px; display: block;">timebar</strong>
             <div>
@@ -724,9 +720,6 @@ body.hide-controls-mode .menu-box:not(.overlay-modal) {
             
             <strong style="color: var(--text-color); margin-top: 10px;">title position</strong>
             <a href="#" id="opt-title-pos">[title pos: default]</a>
-
-            <strong style="color: var(--text-color); margin-top: 10px;">player controls</strong>
-            <a href="#" id="opt-hide-controls">[hide controls]</a>
 
             <strong style="color: var(--text-color); margin-top: 10px;">song change notifications</strong>
             <div>
@@ -843,7 +836,7 @@ body.hide-controls-mode .menu-box:not(.overlay-modal) {
 </div>
 
 <!-- Search Help Modal -->
-<div id="search-help-modal" class="overlay-modal focus-hide">
+<div id="search-help-modal" class="overlay-modal">
 <a href="#" class="modal-close-x">[ x ]</a>
 <pre style="margin: 0; color: var(--text-color);">
 +-- search operands help ---------------+
