@@ -348,6 +348,61 @@ window.UIManager = (function() {
         const actionRow = document.getElementById('action-row');
         if (!actionRow) return;
 
+        const isSplit = document.body.classList.contains('controls-split');
+
+        if (isSplit) {
+            const actionRect = actionRow.getBoundingClientRect();
+
+            document.querySelectorAll('.menu-box').forEach(box => {
+                if (box.classList.contains('overlay-modal')) {
+                    box.style.width = '';
+                    box.style.height = '';
+                    box.style.position = '';
+                    box.style.right = '';
+                    box.style.left = '';
+                    box.style.top = '';
+                    box.style.transform = '';
+                    box.style.maxHeight = '';
+                    box.style.boxSizing = '';
+                    return;
+                }
+
+                if (window.getComputedStyle(box).display !== 'none') {
+                    const barHeight = actionRect.height;
+                    const rightOffset = (window.innerWidth - actionRect.right) + actionRect.width + 15;
+
+                    box.style.position = 'fixed';
+                    box.style.right = rightOffset + 'px';
+                    box.style.left = 'auto';
+                    box.style.top = actionRect.top + 'px';
+                    box.style.transform = 'none';
+                    box.style.height = barHeight + 'px';
+                    box.style.maxHeight = barHeight + 'px';
+                    box.style.boxSizing = 'border-box';
+                    box.style.overflowY = 'auto';
+                    box.style.margin = '0';
+                    box.style.width = '340px';
+                    box.style.zIndex = '99995';
+                }
+            });
+            return;
+        }
+
+        // Reset split styles if returning to default mode
+        document.querySelectorAll('.menu-box').forEach(box => {
+            if (!box.classList.contains('overlay-modal')) {
+                box.style.position = '';
+                box.style.right = '';
+                box.style.left = '';
+                box.style.top = '';
+                box.style.transform = '';
+                box.style.height = '';
+                box.style.maxHeight = '';
+                box.style.boxSizing = '';
+                box.style.zIndex = '';
+            }
+        });
+
         // In sway/mobile mode, or if hidden by focus mode, we shouldn't force widths
         const isHidden = window.getComputedStyle(actionRow).display === 'none';
 
