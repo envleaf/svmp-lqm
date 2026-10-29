@@ -208,6 +208,10 @@ window.UIController = (function() {
         if (controlsSplitBtn) {
             controlsSplitBtn.innerText = ui.t(`[controls: ${controlsSplit}]`);
         }
+        const prevBtn = document.getElementById('music-prev');
+        const nextBtn = document.getElementById('music-next');
+        if (prevBtn) prevBtn.innerText = (controlsSplit === 'split') ? '[^^]' : '[<<]';
+        if (nextBtn) nextBtn.innerText = (controlsSplit === 'split') ? '[vv]' : '[>>]';
 
         if (window.VisualEngine) window.VisualEngine.updateExpieUI();
 
